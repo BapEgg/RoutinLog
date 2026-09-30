@@ -1,2 +1,2 @@
-# Status fields are decoded by Gson. No user records or tokens are decoded yet.
+# Status fields use this rule; account/session DTOs are annotated with @Keep for Gson.
 -keep class com.bapegg.routinlog.data.SystemStatusDto { *; }

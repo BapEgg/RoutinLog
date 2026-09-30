@@ -23,11 +23,18 @@ class BodyMeasurementInputTest {
     }
 
     @Test fun `invalid numeric forms are rejected instead of coerced`() {
-        for (value in listOf("0", "-1", "NaN", "Infinity", "1e3", "83.25", "83,2.1")) {
+        for (value in listOf("0", "-1", "NaN", "Infinity", "1e3", "83.1234", "83,2.1")) {
             val result = BodyMeasurementInput.validate(date, value, "80")
             assertNull("$value must not create a record", result.measurement)
             assertNotNull("$value must have a field error", result.weightError)
         }
+    }
+
+    @Test fun `canonical server precision remains editable without losing decimals`() {
+        val result=BodyMeasurementInput.validate(date,"83.123","80.12")
+        assertEquals(BigDecimal("83.123"),result.measurement?.weightKg)
+        assertEquals(BigDecimal("80.12"),result.measurement?.waistCm)
+        assertNotNull(BodyMeasurementInput.validate(date,"83.123","80.123").waistError)
     }
 
     @Test fun `decimal comma and the given record date are preserved correctly`() {

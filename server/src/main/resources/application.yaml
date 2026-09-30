@@ -51,3 +51,9 @@ logging:
   level:
     org.hibernate.SQL: WARN
     org.hibernate.orm.jdbc.bind: WARN
+
+routinlog:
+  auth:
+    # A Web OAuth client ID, never an Android client ID or a client secret.
+    # An empty value disables Google sign-in without preventing health/startup.
+    google-web-client-id: ${GOOGLE_WEB_CLIENT_ID:}

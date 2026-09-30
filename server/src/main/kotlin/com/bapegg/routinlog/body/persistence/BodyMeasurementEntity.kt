@@ -38,6 +38,9 @@ class BodyMeasurementEntity(
     @Column(name = "waist_cm", precision = 6, scale = 2)
     var waistCm: BigDecimal? = null,
 
+    @Column(length = 1000)
+    var memo: String? = null,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 

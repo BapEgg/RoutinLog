@@ -5,8 +5,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.bapegg.routinlog.data.ProfileDto
 
-/** In-memory UI draft. Never represents an authenticated account or a server write. */
+/** Screen navigation and unsent form drafts. Authentication lives in AccountViewModel. */
 class PreviewSession : ViewModel() {
     var route by mutableStateOf("A01")
         private set
@@ -14,6 +15,10 @@ class PreviewSession : ViewModel() {
     val values = mutableStateMapOf<String, String>()
     var message by mutableStateOf<String?>(null)
     var previewMode by mutableStateOf(false)
+    var accountMode by mutableStateOf(false)
+    var loadedProfile: ProfileDto? = null
+    fun today(): java.time.LocalDate = java.time.LocalDate.now(
+        loadedProfile?.timeZone?.let(java.time.ZoneId::of) ?: java.time.ZoneId.systemDefault())
     fun get(key: String, fallback: String = "") = values[key] ?: fallback
     fun set(key: String, value: String) { values[key] = value }
     fun flag(key: String, fallback: Boolean = false) = values[key]?.toBooleanStrictOrNull() ?: fallback
@@ -30,6 +35,6 @@ class PreviewSession : ViewModel() {
     }
     fun notify(text: String = "체험 화면에 반영했어요. 실제 기록은 저장되지 않아요.") { message = text }
     fun save(to: String) { notify(); go(to) }
-    fun startPreview() { previewMode = true; go("H01") }
-    fun reset() { values.clear(); history.clear(); previewMode = false; route = "A01" }
+    fun startPreview() { reset(); previewMode = true; go("H01") }
+    fun reset() { values.clear(); history.clear(); previewMode = false; accountMode = false; loadedProfile=null; message = null; route = "A01" }
 }

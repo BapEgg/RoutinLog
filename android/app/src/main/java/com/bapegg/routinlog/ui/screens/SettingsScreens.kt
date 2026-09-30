@@ -16,12 +16,12 @@ import kotlin.math.floor
 @Composable
 internal fun SettingsScreens(id: String, ui: PreviewSession) {
     when (id) {
-        "S01" -> SettingsOverview(ui)
+        "S01" -> if(ui.accountMode)LiveSettings(ui)else SettingsOverview(ui)
         "S02" -> ProfileSettings(ui)
         "S03" -> HealthSettings(ui)
-        "S04" -> AccountSettings(ui)
+        "S04" -> if(ui.accountMode)LiveSettings(ui,accountPage=true)else AccountSettings(ui)
         "S05" -> NotificationSettings(ui)
-        "S06" -> DeleteAccount(ui)
+        "S06" -> if(ui.accountMode)LiveDeleteAccount(ui)else DeleteAccount(ui)
         "E01" -> NetworkRequired(ui)
         "E02" -> UnsavedChanges(ui)
     }
@@ -29,9 +29,10 @@ internal fun SettingsScreens(id: String, ui: PreviewSession) {
 
 @Composable
 internal fun SettingsFooter(id: String, ui: PreviewSession) {
+    val account=LocalAccount.current
     when (id) {
         "S02" -> UiButton("변경 저장", {
-            if (applyProfileDraft(ui)) ui.save("S01")
+            if (applyProfileDraft(ui)) {if(ui.accountMode)account.saveProfile()else ui.save("S01")}
         })
         "S05" -> UiButton("알림 설정 저장", {
             ui.notify("체험 화면에 설정을 반영했어요. 실제 알림은 아직 발송되지 않아요."); ui.go("S01")
@@ -43,7 +44,7 @@ internal fun SettingsFooter(id: String, ui: PreviewSession) {
             UiButton("취소", { ui.set("s.deleteText", ""); ui.go("S04") }, primary = false)
         }
         "E01" -> {
-            UiButton("다시 연결 확인", { ui.notify("실제 서버 연결 전이에요. 현재는 네트워크 안내 화면을 확인할 수 있어요.") })
+            UiButton("다시 연결 확인", { if(ui.accountMode)account.refresh()else ui.notify("실제 서버 연결 전이에요. 현재는 네트워크 안내 화면을 확인할 수 있어요.") })
             UiButton("오늘 기록으로", { ui.go("H01") }, primary = false)
         }
     }
@@ -67,6 +68,7 @@ private fun SettingsOverview(ui: PreviewSession) {
         DividerLine()
         UiRow("데이터 · 계정", "내보내기 · 삭제", onClick = { ui.go("S04") })
     }
+    if(LocalAccount.current.state.userId!=null)UiButton("내 기록으로 돌아가기",LocalAccount.current.resume,primary=false)
     UiButton("둘러보기 끝내기", { ui.reset() }, primary = false)
 }
 
@@ -120,7 +122,7 @@ private fun ProfileSettings(ui: PreviewSession) {
     UiButton("일일 영양 목표 수정", {
         if (applyProfileDraft(ui)) { ui.set("onboardingReturnRoute", "S02"); ui.go("A07") }
     }, primary = false)
-    ReportDateField("변경 적용일", "s.goalApplyDate", "2026-09-28", ui)
+    ReportDateField("변경 적용일", "s.goalApplyDate", if(ui.accountMode)ui.today().toString()else"2026-09-28", ui)
     ReportNote { BodyText("목적·목표를 바꿔도 이전 주는 당시의 목표로 비교해요.") }
 }
 

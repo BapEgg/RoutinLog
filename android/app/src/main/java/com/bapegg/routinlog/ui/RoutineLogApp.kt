@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -33,10 +34,77 @@ import com.bapegg.routinlog.ui.screens.*
 import com.bapegg.routinlog.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.bapegg.routinlog.data.BodyMeasurementWriteDto
+import com.bapegg.routinlog.domain.BodyMeasurementInput
+import java.math.RoundingMode
+
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null) {
+    val ui:PreviewSession=viewModel()
+    val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
+    val context = LocalContext.current
+    LaunchedEffect(accountState.routingVersion) {
+        if(accountState.routingVersion>0 && !ui.previewMode && initialRoute==null) {
+            if(accountState.ready && accountState.userId!=null) {
+                AccountDrafts.begin(ui,accountState.profile);AccountDrafts.records(ui,accountState.records)
+            } else ui.reset()
+        }
+    }
+    LaunchedEffect(accountState.records,ui.accountMode) {
+        if(ui.accountMode)AccountDrafts.records(ui,accountState.records)
+    }
+    LaunchedEffect(accountState.notice) { accountState.notice?.let{ui.notify(it);accountModel?.clearNotice()} }
+    val actions=AccountActions(
+        state=accountState,
+        login={
+            var current=context
+            while(current is android.content.ContextWrapper && current !is android.app.Activity)current=current.baseContext
+            val activity=current as? android.app.Activity
+            if(activity!=null&&accountModel!=null){ui.previewMode=false;accountModel.login(activity)}
+            else ui.notify("로그인을 실행할 수 없어요. 앱을 다시 열어주세요.")
+        },
+        refresh={accountModel?.refresh { profile ->
+            if(profile!=null)AccountDrafts.apply(ui,profile)else AccountDrafts.begin(ui,null)
+        }},
+        resume={ui.reset();accountModel?.refresh(navigate=true)},
+        saveProfile={
+            runCatching {AccountDrafts.profile(ui)}.onSuccess {draft->
+                accountModel?.saveProfile(draft){saved->AccountDrafts.apply(ui,saved);ui.go("H01")}
+            }.onFailure {ui.notify(it.message?:"시작 설정을 확인해주세요.")}
+        },
+        loadDate={date->accountModel?.loadDate(date){record->
+            if(ui.accountMode&&ui.get("body.date",ui.today().toString())==date){AccountDrafts.bodyDraft(ui,record);ui.set("body.loadedDate",date)}
+        }},
+        loadRange={from,to->accountModel?.loadRange(from,to)},
+        saveBody={
+            val date=runCatching {LocalDate.parse(ui.get("body.date",ui.today().toString()))}.getOrNull()
+            if(date==null||date !in LocalDate.of(1900,1,1)..ui.today())ui.notify("1900년부터 오늘까지의 측정 날짜를 선택해주세요.") else {
+                val result=BodyMeasurementInput.validate(date,ui.get("body.draftWeight"),ui.get("body.draftWaist"))
+                val record=result.measurement
+                if(record==null)ui.set("body.error",listOfNotNull(result.formError,result.weightError,result.waistError).joinToString("\n"))
+                else if(ui.get("body.draftMemo").length>1000)ui.set("body.error","메모는 1,000자까지 입력해주세요.")
+                else accountModel?.saveBody(date.toString(),BodyMeasurementWriteDto(
+                    weightKg=record.weightKg?.setScale(3,RoundingMode.HALF_UP)?.toDouble(),
+                    waistCm=record.waistCm?.setScale(2,RoundingMode.HALF_UP)?.toDouble(),
+                    version=ui.get("body.draftVersion").toLongOrNull(),memo=ui.get("body.draftMemo").takeIf{it.isNotBlank()}
+                )){ui.set("home.date",date.toString());ui.go("H01")}
+            }
+        },
+        deleteBody={ui.get("body.draftVersion").toLongOrNull()?.let{version->
+            accountModel?.deleteBody(ui.get("body.date"),version){ui.go("H05")}
+        }},
+        logout={accountModel?.logout{ui.reset()}},
+        deleteAccount={
+            var current=context
+            while(current is android.content.ContextWrapper&&current !is android.app.Activity)current=current.baseContext
+            (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
+        },
+    )
+    CompositionLocalProvider(LocalAccount provides actions) { RoutineLogContent(model,initialRoute,ui) }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null) {
-    val ui:PreviewSession=viewModel()
+@Composable private fun RoutineLogContent(model:RoutineLogViewModel,initialRoute:String?,ui:PreviewSession) {
+    val account=LocalAccount.current
     val connection by model.state.collectAsStateWithLifecycle()
     var catalog by remember { mutableStateOf(false) }
     val snackbar=remember { SnackbarHostState() }
@@ -49,18 +117,23 @@ import java.time.format.DateTimeFormatter
     Scaffold(containerColor=Silver,snackbarHost={SnackbarHost(snackbar)},topBar={
         Column(Modifier.statusBarsPadding()) {
             if(ui.previewMode || BuildConfig.DEBUG)Row(Modifier.fillMaxWidth().background(Color(0xFFE4EAEF)).padding(start=20.dp,end=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                Text(if(ui.previewMode)"샘플 체험 · 실제 기록은 저장되지 않아요" else "디자인 구현 확인",Modifier.weight(1f),fontSize=11.sp,color=Muted)
+                Text(if(ui.previewMode)"샘플 체험 · 실제 기록은 저장되지 않아요" else if(ui.accountMode)"내 계정 · 온라인 기록" else "개발 버전",Modifier.weight(1f),fontSize=11.sp,color=Muted)
                 if(BuildConfig.DEBUG)TextButton(onClick={catalog=true},contentPadding=PaddingValues(horizontal=10.dp,vertical=0.dp),modifier=Modifier.heightIn(min=40.dp)){Text("화면 목록",fontSize=11.sp)}
             }
             ScreenHeader(base,ui)
         }
     },bottomBar={if(!keyboard)Column(Modifier.navigationBarsPadding().background(Color(0xFFF8FAFC))) {
-        if(hasFooter(base))Column(Modifier.padding(horizontal=20.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){ScreenFooter(base,ui)}
+        if(hasFooter(base)&&(!ui.accountMode||base in setOf("A02","A03","A04","A05","A06","A07","A08","H04","S02","E01")))Column(Modifier.padding(horizontal=20.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){ScreenFooter(base,ui)}
         if(ScreenCatalog[base]?.tab?.isNotBlank()==true)AppTabs(base,ui)
     }}) {padding->
         Box(Modifier.fillMaxSize().padding(padding).imePadding(),contentAlignment=Alignment.TopCenter) {
             AnimatedContent(targetState=base,label="screen",transitionSpec={fadeIn() togetherWith fadeOut()}) {id->
                 Column(Modifier.widthIn(max=600.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=14.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                    if(account.state.error!=null&&!ui.previewMode)UiCard {
+                        Text(account.state.error,color=MaterialTheme.colorScheme.error)
+                        if(!account.state.ready)UiButton("다시 연결",account.resume,primary=false)
+                        else if(ui.accountMode&&id=="H04")UiButton("최신 기록 다시 불러오기",{account.loadDate(ui.get("body.date",ui.today().toString()))},primary=false)
+                    }
                     ScreenContent(id,ui);Spacer(Modifier.height(8.dp))
                 }
             }
@@ -76,11 +149,22 @@ import java.time.format.DateTimeFormatter
         LazyColumn(Modifier.heightIn(max=530.dp)) {
             item{Text("가상 데이터로 디자인과 화면 흐름을 확인해요.",color=Muted)}
             item{TextButton(onClick=model::checkStatus,enabled=!connection.checkingStatus){Text("개발 서버 연결 확인")};Text(connection.statusMessage,fontSize=12.sp,color=Muted)}
-            items(ScreenCatalog.values.toList()){s->TextButton(onClick={catalog=false;ui.previewMode=true;ui.go(s.id)},modifier=Modifier.fillMaxWidth()){Text("${s.id}   ${s.title}",Modifier.fillMaxWidth(),color=Ink)}}
+            items(ScreenCatalog.values.toList()){s->TextButton(onClick={catalog=false;if(!ui.previewMode)ui.reset();ui.previewMode=true;ui.go(s.id)},modifier=Modifier.fillMaxWidth()){Text("${s.id}   ${s.title}",Modifier.fillMaxWidth(),color=Ink)}}
         }
     })
+    if(account.state.initializing||account.state.busy)androidx.compose.ui.window.Dialog(onDismissRequest={},properties=androidx.compose.ui.window.DialogProperties(dismissOnBackPress=false,dismissOnClickOutside=false)) {
+        UiCard { Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            CircularProgressIndicator(Modifier.size(28.dp),color=DeepBlue,strokeWidth=3.dp)
+            Text(if(account.state.initializing)"내 기록 확인 중…"else"연결 중…")
+        } }
+    }
 }
-@Composable private fun ScreenContent(id:String,ui:PreviewSession){when(id.first()){'A','H'->HomeScreens(id,ui);'F'->FoodScreens(id,ui);'W'->WorkoutScreens(id,ui);else->ReportScreens(id,ui)}}
+@Composable private fun ScreenContent(id:String,ui:PreviewSession){
+    if(ui.accountMode&&id !in setOf("A01","A02","A03","A04","A05","A06","A07","A08","H01","H02","H03","H04","H05","S01","S02","S04","S06","E01")) {
+        LiveFeaturePending(ui);return
+    }
+    when(id.first()){'A','H'->HomeScreens(id,ui);'F'->FoodScreens(id,ui);'W'->WorkoutScreens(id,ui);else->ReportScreens(id,ui)}
+}
 @Composable private fun ScreenFooter(id:String,ui:PreviewSession){when(id.first()){'A','H'->HomeFooter(id,ui);'F'->FoodFooter(id,ui);'W'->WorkoutFooter(id,ui);else->ReportFooter(id,ui)}}
 private fun hasFooter(id:String)=id !in setOf("A01","H01","H02","H03","H05","H06","F01","F02","F06","F08","R08","R09","S01","S03","S04","E02")
 @Composable private fun ScreenHeader(id:String,ui:PreviewSession) {
@@ -97,7 +181,7 @@ private fun hasFooter(id:String)=id !in setOf("A01","H01","H02","H03","H05","H06
         Row(verticalAlignment=Alignment.CenterVertically) {
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                 if(id=="H01")Text("나만의 루틴로그",color=Muted,fontSize=11.sp)
-                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",LocalDate.now().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else screen.title
+                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",ui.today().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else screen.title
                 Text(title,style=if(root)MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,modifier=Modifier.semantics{heading()}.then(if(id=="H01")Modifier.clickable{ui.go("H03")}else Modifier))
                 if(root&&id=="H01")Text("나의 일상을 차곡차곡",fontSize=12.sp,color=Muted)
             }

@@ -83,9 +83,19 @@ class SecurityBoundaryTest @Autowired constructor(
     }
 
     @Test
-    fun `even a test-authenticated identity cannot bypass the closed API boundary`() {
+    fun `a generic password principal cannot bypass the verified-account API boundary`() {
         mvc.perform(get("/api/v1/body-measurements").with(user("test-only-principal").roles("ADMIN")))
             .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `missing Google configuration leaves health available but sign-in returns explicit 503`() {
+        mvc.perform(post("/api/v1/auth/google/challenge"))
+            .andExpect(status().isServiceUnavailable)
+            .andExpect(jsonPath("$.code").value("AUTH_NOT_CONFIGURED"))
+            .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")))
+            .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+        mvc.perform(get("/actuator/health")).andExpect(status().isOk)
     }
 
     @Test

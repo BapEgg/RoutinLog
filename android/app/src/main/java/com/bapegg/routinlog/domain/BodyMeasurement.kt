@@ -17,7 +17,6 @@ data class MeasurementInputResult(
 )
 
 object BodyMeasurementInput {
-    private val decimal = Regex("^[0-9]{1,4}([.,][0-9])?$")
     // Match the server's technical storage limits; these are not medical recommendations.
     private val maxWeightKg = BigDecimal("1000")
     private val maxWaistCm = BigDecimal("500")
@@ -28,18 +27,18 @@ object BodyMeasurementInput {
         if (weightText.isEmpty() && waistText.isEmpty()) {
             return MeasurementInputResult(formError = "체중이나 허리둘레 중 하나를 입력해주세요.")
         }
-        fun parse(value: String): BigDecimal? = if (decimal.matches(value)) {
+        fun parse(value: String, precision:Int): BigDecimal? = if (Regex("^[0-9]{1,4}([.,][0-9]{1,$precision})?$").matches(value)) {
             value.replace(',', '.').toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
         } else null
-        val weightValue = parse(weightText)
-        val waistValue = parse(waistText)
+        val weightValue = parse(weightText,3)
+        val waistValue = parse(waistText,2)
         val weightError = when {
-            weightText.isNotEmpty() && weightValue == null -> "0보다 큰 숫자를 소수점 한 자리까지 입력해주세요."
+            weightText.isNotEmpty() && weightValue == null -> "0보다 큰 숫자를 소수점 세 자리까지 입력해주세요."
             weightValue != null && weightValue > maxWeightKg -> "입력 가능한 최대 체중은 1,000kg이에요."
             else -> null
         }
         val waistError = when {
-            waistText.isNotEmpty() && waistValue == null -> "0보다 큰 숫자를 소수점 한 자리까지 입력해주세요."
+            waistText.isNotEmpty() && waistValue == null -> "0보다 큰 숫자를 소수점 두 자리까지 입력해주세요."
             waistValue != null && waistValue > maxWaistCm -> "입력 가능한 최대 허리둘레는 500cm예요."
             else -> null
         }

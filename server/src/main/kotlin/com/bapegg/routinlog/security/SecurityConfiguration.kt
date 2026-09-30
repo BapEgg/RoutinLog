@@ -1,16 +1,17 @@
 package com.bapegg.routinlog.security
 
+import com.bapegg.routinlog.auth.AuthSessionService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
-import org.springframework.http.HttpStatus
+import org.springframework.security.authorization.AuthorizationDecision
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.authentication.HttpStatusEntryPoint
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
 @Configuration(proxyBeanMethods = false)
-class SecurityConfiguration {
+class SecurityConfiguration(private val sessions: AuthSessionService) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -18,7 +19,11 @@ class SecurityConfiguration {
             .authorizeHttpRequests { requests ->
                 requests
                     .requestMatchers(HttpMethod.GET, "/actuator/health", "/api/v1/system/status").permitAll()
-                    // Keep every record and future endpoint closed until real authentication exists.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/google/challenge", "/api/v1/auth/google", "/api/v1/auth/refresh").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/me/profile", "/api/v1/body-measurements").access(::accountAccess)
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile", "/api/v1/body-measurements/*").access(::accountAccess)
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/me", "/api/v1/body-measurements/*").access(::accountAccess)
                     .anyRequest().denyAll()
             }
             .formLogin { it.disable() }
@@ -26,12 +31,22 @@ class SecurityConfiguration {
             .logout { it.disable() }
             .requestCache { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            // No cookie authentication or write endpoints exist. Revisit with the real session design.
+            // Credentials are explicit Authorization headers; no cookie/session authentication is accepted.
             .csrf { it.disable() }
+            .addFilterBefore(OpaqueTokenFilter(sessions), UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(AuthRateLimitFilter(), OpaqueTokenFilter::class.java)
             .exceptionHandling {
-                it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-                it.accessDeniedHandler { _, response, _ -> response.status = HttpStatus.FORBIDDEN.value() }
+                it.authenticationEntryPoint { _, response, _ -> SecurityErrorWriter.write(response, 401, "AUTH_REQUIRED", "로그인이 필요해요.") }
+                it.accessDeniedHandler { _, response, _ -> SecurityErrorWriter.write(response, 403, "ACCESS_DENIED", "이 요청을 처리할 수 없어요.") }
             }
         return http.build()
+    }
+
+    private fun accountAccess(
+        authentication: java.util.function.Supplier<out org.springframework.security.core.Authentication>,
+        @Suppress("UNUSED_PARAMETER") context: org.springframework.security.web.access.intercept.RequestAuthorizationContext,
+    ): AuthorizationDecision {
+        val identity = authentication.get()
+        return AuthorizationDecision(identity.isAuthenticated && identity.principal is AuthenticatedUser)
     }
 }

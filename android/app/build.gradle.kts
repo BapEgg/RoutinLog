@@ -1,4 +1,5 @@
 import java.net.URI
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -8,11 +9,21 @@ plugins {
 fun String.asJavaLiteral() = "\"" + replace("\\", "\\\\").replace("\"", "\\\"")
     .replace("\n", "\\n").replace("\r", "\\r") + "\""
 
+// Machine-only public identifiers; local.properties is excluded from version control.
+val localSettings = Properties().apply {
+    val settingsFile = rootProject.file("local.properties")
+    if (settingsFile.exists()) settingsFile.inputStream().use { load(it) }
+}
+
 val releaseApiUrl = providers.gradleProperty("routinlog.apiBaseUrl")
     .orElse(providers.environmentVariable("ROUTINLOG_API_BASE_URL"))
     .orElse("").get().trim()
 val debugApiUrl = providers.gradleProperty("routinlog.debugApiBaseUrl")
     .orElse("http://10.0.2.2:8080/").get().trim()
+// OAuth web client IDs are public identifiers. Client secrets must never be packaged in the app.
+val googleWebClientId = providers.gradleProperty("routinlog.googleWebClientId")
+    .orElse(providers.environmentVariable("GOOGLE_WEB_CLIENT_ID"))
+    .orElse(localSettings.getProperty("routinlog.googleWebClientId", "")).get().trim()
 
 android {
     namespace = "com.bapegg.routinlog"
@@ -25,11 +36,11 @@ android {
         versionCode = 1
         versionName = "0.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", googleWebClientId.asJavaLiteral())
     }
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
             versionNameSuffix = "-dev"
             buildConfigField("String", "API_BASE_URL", debugApiUrl.asJavaLiteral())
         }
@@ -75,8 +86,15 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Stable releases verified against the Android/Google Identity release notes.
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    // 1.2.1 requires Kotlin metadata 2.4; use the release compatible with AGP's Kotlin compiler.
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

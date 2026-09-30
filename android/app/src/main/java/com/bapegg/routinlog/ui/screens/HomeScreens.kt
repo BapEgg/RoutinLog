@@ -29,7 +29,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.floor
 
-/** Screen drafts are held in PreviewSession only. No account or server write is implied. */
+/** Shared design; authenticated recording uses server-backed AccountActions. */
 @Composable
 fun HomeScreens(id: String, ui: PreviewSession) {
     when (id) {
@@ -41,11 +41,11 @@ fun HomeScreens(id: String, ui: PreviewSession) {
         "A06" -> Schedule(ui)
         "A07" -> StartingTargets(ui)
         "A08" -> StepConnection(ui)
-        "H01" -> Today(ui)
-        "H02" -> FirstHome(ui)
+        "H01" -> if(ui.accountMode)LiveToday(ui)else Today(ui)
+        "H02" -> if(ui.accountMode)LiveToday(ui)else FirstHome(ui)
         "H03" -> RecordCalendar(ui)
         "H04" -> BodyEntry(ui)
-        "H05" -> BodyHistory(ui)
+        "H05" -> if(ui.accountMode)LiveBodyHistory(ui)else BodyHistory(ui)
         "H06" -> Steps(ui)
         "H07" -> Condition(ui)
     }
@@ -53,8 +53,9 @@ fun HomeScreens(id: String, ui: PreviewSession) {
 
 @Composable
 fun HomeFooter(id: String, ui: PreviewSession) {
+    val account=LocalAccount.current
     when (id) {
-        "A02" -> UiButton("동의하고 계속", { ui.go("A03") }, enabled = ui.flag("onb.terms") && ui.flag("onb.privacy"))
+        "A02" -> UiButton("동의하고 계속", { ui.go("A03") }, enabled = ui.flag("onb.terms") && ui.flag("onb.privacy") && (!ui.accountMode||ui.flag("onb.health")))
         "A03" -> UiButton("다음", { ui.go("A04") })
         "A04" -> UiButton("다음", {
             val error = basicsError(ui)
@@ -88,15 +89,21 @@ fun HomeFooter(id: String, ui: PreviewSession) {
             UiButton("기본 정보 다시 보기", { ui.go("A04") }, primary = false)
         }
         "A08" -> {
-            UiButton("걸음수 연동하기", { ui.notify("걸음 연동은 아직 연결되지 않았어요. 지금은 샘플 화면으로 둘러볼 수 있어요.") })
-            UiButton("나중에 할게요", { ui.go("H02") }, primary = false)
+            if(ui.accountMode){
+                UiButton("시작 설정 저장하고 기록하기",account.saveProfile)
+                MutedText("걸음수 연결은 추후 제공돼요.")
+            }else{
+                UiButton("걸음수 연동하기", { ui.notify("걸음 연동은 아직 연결되지 않았어요. 지금은 샘플 화면으로 둘러볼 수 있어요.") })
+                UiButton("나중에 할게요", { ui.go("H02") }, primary = false)
+            }
         }
-        "H04" -> UiButton("측정값 저장", { saveBody(ui) })
+        "H04" -> UiButton("측정값 저장", { if(ui.accountMode)account.saveBody()else saveBody(ui) },enabled=!ui.accountMode||ui.get("body.loadedDate")==bodyDate(ui).toString())
         "H07" -> UiButton("컨디션 저장", { saveCondition(ui) })
     }
 }
 
 @Composable private fun Welcome(ui: PreviewSession) {
+    val account=LocalAccount.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Charcoal), contentAlignment = Alignment.Center) {
             Text("r", color = Celery, fontWeight = FontWeight.Bold, fontSize = 25.sp)
@@ -118,21 +125,28 @@ fun HomeFooter(id: String, ui: PreviewSession) {
             Text("지난주보다\n나를 더 잘 알게 돼요.", style = MaterialTheme.typography.bodyMedium)
         }
     }
-    UiButton("G   Google로 계속", { ui.notify("Google 로그인은 아직 연결되지 않았어요. ‘로그인 없이 둘러보기’에서 화면을 먼저 확인해보세요.") }, primary = false)
+    UiButton("G   Google로 계속",account.login, primary = false)
+    if(account.state.userId!=null)UiButton("내 기록으로 돌아가기",account.resume,primary=false)
     UiButton("로그인 없이 둘러보기", { ui.startPreview() }, primary = false)
     Text("내 기록을 오래 보관하려면 로그인이 필요해요.", Modifier.fillMaxWidth(), color = Muted, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
 }
 
 @Composable private fun Consent(ui: PreviewSession) {
     Text("내 기록을\n안전하게 보관해요.", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-    MutedText("기록은 계정별로 보관하며, 계정 설정에서 내보내거나 삭제할 수 있어요.")
+    MutedText(if(ui.accountMode)"계정별로 기록을 보관해요. 선택 연동은 나중에 결정할 수 있어요."else"기록은 계정별로 보관하며, 계정 설정에서 내보내거나 삭제할 수 있어요.")
     UiCard {
         ConsentRow("서비스 이용약관 동의 (필수)", ui.flag("onb.terms")) { ui.toggle("onb.terms") }
         DividerLine()
         ConsentRow("개인정보 수집·이용 동의 (필수)", ui.flag("onb.privacy")) { ui.toggle("onb.privacy") }
+        if(ui.accountMode){DividerLine();ConsentRow("건강정보 수집·이용 동의 (필수)",ui.flag("onb.health")){ui.toggle("onb.health")}}
         Expandable("수집하는 정보 보기", ui, "onb.consentDetails") {
             MutedText("계정 정보와 내가 남긴 신체·식사·운동 기록을 보관해요. 걸음수는 따로 허용한 경우에 가져와요.")
-            MutedText("지금은 화면 체험 단계이며 실제 약관 동의나 계정 생성은 처리되지 않아요.")
+            if(ui.accountMode){
+                BodyText("이용 목적 · 개인 루틴과 몸의 변화를 기록하고 다시 확인하기")
+                MutedText("계정 식별값, 나이·성별·키·체중, 선택한 허리둘레·목표, 생활 활동과 운동 일정, 영양 목표를 보관해요.")
+                MutedText("신체 측정 기록과 메모는 건강정보로 별도 동의를 받아 보관해요. 계정 삭제 시 함께 삭제하며, 동의하지 않아도 샘플은 둘러볼 수 있어요.")
+                MutedText("개발 테스트용 동의 내용 · 버전 $CONSENT_VERSION. 정식 약관과 개인정보 처리방침은 출시 전에 확정해요.")
+            }else MutedText("지금은 화면 체험 단계이며 실제 약관 동의나 계정 생성은 처리되지 않아요.")
         }
     }
     SoftNote("걸음수 연결과 알림은 나중에 선택할 수 있어요.")
@@ -392,7 +406,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
         UiCard { UiRow(meal, if (done) "기록 완료" else "${ui.get("food.meal.$meal", if (meal == "아침") "기본 아침" else "점심 기본 세트")} · 확인 전", icon = if (done) "CircleCheck" else "Utensils", selected = done, onClick = { ui.set("food.activeMeal", meal); ui.go("F03") }) }
     }
     UiCard { UiRow("지난주 리포트", "다음 주 제안 1건", icon = "ChartNoAxesCombined", onClick = { ui.go("R01") }) }
-    UiCard { UiRow(if (today == LocalDate.now()) "오늘의 컨디션" else "이날의 컨디션", if (ui.flag("condition.$today.saved")) savedConditionSummary(ui, today) else "피로 · 수면 · 근육통 · 짧은 메모", icon = "HeartPulse", onClick = { ui.go("H07") }) }
+    UiCard { UiRow(if (today == ui.today()) "오늘의 컨디션" else "이날의 컨디션", if (ui.flag("condition.$today.saved")) savedConditionSummary(ui, today) else "피로 · 수면 · 근육통 · 짧은 메모", icon = "HeartPulse", onClick = { ui.go("H07") }) }
 }
 
 @Composable private fun FirstHome(ui: PreviewSession) {
@@ -410,7 +424,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
         MutedText("내 루틴을 만들거나 프로그램을 골라요.")
         UiButton("운동 루틴 만들기", { ui.go("W01") })
     }
-    UiRow("오늘 체중 · 허리 먼저 기록", icon = "Scale", onClick = { prepareBody(ui, LocalDate.now()); ui.go("H04") })
+    UiRow("오늘 체중 · 허리 먼저 기록", icon = "Scale", onClick = { prepareBody(ui, ui.today()); ui.go("H04") })
     UiRow("걸음수 연동 확인", icon = "Footprints", onClick = { ui.go("S03") })
 }
 
@@ -424,15 +438,20 @@ fun HomeFooter(id: String, ui: PreviewSession) {
             Column(Modifier.weight(1f).heightIn(min = 72.dp).clip(RoundedCornerShape(12.dp)).background(if (active) Charcoal else Color.White).border(1.dp, if (active) Charcoal else Border, RoundedCornerShape(12.dp)).clickable { ui.set("home.date", day.toString()) }.semantics { contentDescription = "${day.monthValue}월 ${day.dayOfMonth}일 ${weekDays[index]}요일"; selected = active }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(weekDays[index], color = if (active) Color.White.copy(alpha = .7f) else Muted, fontSize = 11.sp)
                 Text(day.dayOfMonth.toString(), color = if (active) Color.White else Ink, fontWeight = FontWeight.Bold)
-                Text(if (day == LocalDate.now()) "•" else if (index < 2) "✓" else " ", color = if (active) Celery else Color(0xFF507B31), fontSize = 11.sp)
+                Text(if (day == ui.today()) "•" else if (index < 2) "✓" else " ", color = if (active) Celery else Color(0xFF507B31), fontSize = 11.sp)
             }
         }
     }
 }
 
 @Composable private fun RecordCalendar(ui: PreviewSession) {
-    val today = LocalDate.now()
+    val today = ui.today()
     val month = runCatching { YearMonth.parse(ui.get("home.calendarMonth", YearMonth.from(selectedHomeDate(ui)).toString())) }.getOrDefault(YearMonth.from(today))
+    val account=LocalAccount.current
+    LaunchedEffect(month,ui.accountMode) {
+        if(ui.accountMode && month.atDay(1)<=today && month.atEndOfMonth()>=earliestRecordDate)
+            account.loadRange(month.atDay(1).coerceAtLeast(earliestRecordDate).toString(),month.atEndOfMonth().coerceAtMost(today).toString())
+    }
     UiCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { ui.set("home.calendarMonth", month.minusMonths(1).toString()) }, modifier = Modifier.semantics { contentDescription = "이전 달" }) { UiIcon("ChevronLeft") }
@@ -451,22 +470,21 @@ fun HomeFooter(id: String, ui: PreviewSession) {
                         val date = month.atDay(day)
                         val selected = date == selectedHomeDate(ui)
                         val hasRecord = ui.get("body.$date.weight").isNotBlank() || ui.get("body.$date.waist").isNotBlank()
-                        val fill = when { selected -> Charcoal; hasRecord -> Celery; date < today && day % 3 == 0 -> Color(0xFFE3EDD9); else -> Color(0xFFF3F5F7) }
-                        Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(10.dp)).background(fill).clickable { ui.set("home.date", date.toString()) }.semantics { contentDescription = "${date.year}년 ${date.monthValue}월 ${date.dayOfMonth}일"; this.selected = selected }, contentAlignment = Alignment.Center) {
+                        val fill = when { selected -> Charcoal; hasRecord -> Celery; !ui.accountMode && date < today && day % 3 == 0 -> Color(0xFFE3EDD9); else -> Color(0xFFF3F5F7) }
+                        Box(Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(10.dp)).background(fill).clickable(enabled=!ui.accountMode||date in earliestRecordDate..today) { ui.set("home.date", date.toString()) }.semantics { contentDescription = "${date.year}년 ${date.monthValue}월 ${date.dayOfMonth}일"; this.selected = selected }, contentAlignment = Alignment.Center) {
                             Text(day.toString(), color = if (selected) Color.White else Ink, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
                 }
             }
         }
-        MutedText("■ 기록 완료　▧ 일부 기록　□ 미기록　┄ 휴식")
+        MutedText(if(ui.accountMode)"■ 측정 기록 있음　□ 미기록"else"■ 기록 완료　▧ 일부 기록　□ 미기록　┄ 휴식")
     }
     val selected = selectedHomeDate(ui)
     UiCard {
         SectionTitle("${selected.monthValue}월 ${selected.dayOfMonth}일")
-        KeyValue("식사", "2 / ${ui.get("food.slots", "아침|점심|저녁").split('|').size}끼 기록")
-        KeyValue("운동", "하체 A · 일부 수행")
-        KeyValue("신체", when { ui.get("body.$selected.weight").isNotBlank() && ui.get("body.$selected.waist").isNotBlank() -> "체중 · 허리 기록 완료"; ui.get("body.$selected.waist").isNotBlank() -> "허리 기록 · 체중 미기록"; else -> "체중 기록 · 허리 미기록" })
+        if(!ui.accountMode){KeyValue("식사", "2 / ${ui.get("food.slots", "아침|점심|저녁").split('|').size}끼 기록");KeyValue("운동", "하체 A · 일부 수행")}
+        KeyValue("신체", when { ui.get("body.$selected.weight").isNotBlank() && ui.get("body.$selected.waist").isNotBlank() -> "체중 · 허리 기록 완료"; ui.get("body.$selected.waist").isNotBlank() -> "허리 기록 · 체중 미기록"; ui.get("body.$selected.weight").isNotBlank() -> "체중 기록 · 허리 미기록"; else->"아직 기록 전" })
         UiButton("이 날짜 기록 보기", { ui.go("H01") })
     }
     SoftNote("계획과 달라도 괜찮아요. 먹고 운동한 만큼 기록하면 돼요.")
@@ -474,26 +492,28 @@ fun HomeFooter(id: String, ui: PreviewSession) {
 
 @Composable private fun BodyEntry(ui: PreviewSession) {
     val date = bodyDate(ui)
-    val imperial = ui.get("onb.units", "metric") == "imperial"
+    val account=LocalAccount.current
+    LaunchedEffect(date,ui.accountMode){if(ui.accountMode){ui.set("body.loadedDate","");account.loadDate(date.toString())}}
+    val imperial = if(ui.accountMode)account.state.profile?.units=="IMPERIAL"else ui.get("onb.units", "metric") == "imperial"
     UiCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 MutedText("측정일")
-                Text("${if (date == LocalDate.now()) "오늘 · " else ""}${date.monthValue}월 ${date.dayOfMonth}일", fontWeight = FontWeight.Bold)
+                Text("${if (date == ui.today()) "오늘 · " else ""}${date.monthValue}월 ${date.dayOfMonth}일", fontWeight = FontWeight.Bold)
             }
             TextButton(onClick = { ui.toggle("body.dateOpen") }) { Text(if (ui.flag("body.dateOpen")) "접기" else "날짜 변경") }
         }
         if (ui.flag("body.dateOpen")) {
-            Chips(listOf("오늘", "어제", "직접 선택"), ui.get("body.dateChoice", if (date == LocalDate.now()) "오늘" else "직접 선택")) {
+            Chips(listOf("오늘", "어제", "직접 선택"), ui.get("body.dateChoice", if (date == ui.today()) "오늘" else "직접 선택")) {
                 ui.set("body.dateChoice", it)
-                when (it) { "오늘" -> prepareBody(ui, LocalDate.now()); "어제" -> prepareBody(ui, LocalDate.now().minusDays(1)) }
+                when (it) { "오늘" -> prepareBody(ui, ui.today()); "어제" -> prepareBody(ui, ui.today().minusDays(1)) }
             }
             if (ui.get("body.dateChoice") == "직접 선택") {
                 Input("측정한 날짜", ui.get("body.dateText", date.toString()), { ui.set("body.dateText", it) })
-                MutedText("예: ${LocalDate.now()} · 연도-월-일 순서")
+                MutedText("예: ${ui.today()} · 연도-월-일 순서")
                 UiButton("이 날짜로 변경", {
                     val chosen = runCatching { LocalDate.parse(ui.get("body.dateText")) }.getOrNull()
-                    if (chosen == null || chosen !in earliestRecordDate..LocalDate.now()) ui.notify("1900년부터 오늘까지의 날짜를 연도-월-일로 입력해주세요.") else prepareBody(ui, chosen)
+                    if (chosen == null || chosen !in earliestRecordDate..ui.today()) ui.notify("1900년부터 오늘까지의 날짜를 연도-월-일로 입력해주세요.") else prepareBody(ui, chosen)
                 }, primary = false)
             }
         }
@@ -503,18 +523,27 @@ fun HomeFooter(id: String, ui: PreviewSession) {
         else { ui.set("body.draftWeight", it); ui.set("body.draftWeightLb", converted(it, 2.2046226218)) }
         ui.set("body.error", "")
     }, numeric = true)
-    MutedText("직전 기록 ${if (imperial) "183.4 lb" else "83.2 kg"} · ${date.minusDays(1).monthValue}월 ${date.minusDays(1).dayOfMonth}일")
+    if(!ui.accountMode)MutedText("직전 기록 ${if (imperial) "183.4 lb" else "83.2 kg"} · ${date.minusDays(1).monthValue}월 ${date.minusDays(1).dayOfMonth}일")
+    else account.state.records.firstOrNull{it.date<date.toString()&&it.weightKg!=null}?.let{MutedText("이전 기록 ${liveNumber(it.weightKg!!*if(imperial)2.2046226218 else 1.0)} ${if(imperial)"lb"else"kg"} · ${it.date}")}
     Input(if (imperial) "허리둘레 · in" else "허리둘레 · cm", if (imperial) ui.get("body.draftWaistIn", converted(ui.get("body.draftWaist"), 1 / 2.54)) else ui.get("body.draftWaist"), {
         if (imperial) { ui.set("body.draftWaistIn", it); ui.set("body.draftWaist", converted(it, 2.54)) }
         else { ui.set("body.draftWaist", it); ui.set("body.draftWaistIn", converted(it, 1 / 2.54)) }
         ui.set("body.error", "")
     }, numeric = true)
-    MutedText("직전 기록 ${if (imperial) "31.5 in" else "80.0 cm"} · ${date.minusDays(1).monthValue}월 ${date.minusDays(1).dayOfMonth}일")
+    if(!ui.accountMode)MutedText("직전 기록 ${if (imperial) "31.5 in" else "80.0 cm"} · ${date.minusDays(1).monthValue}월 ${date.minusDays(1).dayOfMonth}일")
+    else account.state.records.firstOrNull{it.date<date.toString()&&it.waistCm!=null}?.let{MutedText("이전 기록 ${liveNumber(it.waistCm!!/if(imperial)2.54 else 1.0)} ${if(imperial)"in"else"cm"} · ${it.date}")}
     Input("측정 메모 · 선택", ui.get("body.draftMemo"), { ui.set("body.draftMemo", it) }, multiline = true)
     MutedText("예: 기상 후, 식사 전")
     if (ui.get("body.error").isNotBlank()) Text(ui.get("body.error"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
     SoftNote("측정한 항목만 남겨주세요.\n둘 중 하나만 입력해도 저장할 수 있어요.")
     UiRow("이전 기록 · 추세 보기", icon = "ChartNoAxesCombined", onClick = { ui.go("H05") })
+    if(ui.accountMode&&ui.get("body.draftVersion").isNotBlank()){
+        UiButton("이 날짜의 측정 기록 삭제",{ui.set("body.deleteConfirm","true")},primary=false)
+        if(ui.flag("body.deleteConfirm"))AlertDialog(onDismissRequest={ui.set("body.deleteConfirm","false")},
+            title={Text("측정 기록을 삭제할까요?")},text={Text("${date}의 체중·허리둘레와 메모를 삭제해요.")},
+            confirmButton={TextButton(onClick={ui.set("body.deleteConfirm","false");account.deleteBody()}){Text("삭제",color=MaterialTheme.colorScheme.error)}},
+            dismissButton={TextButton(onClick={ui.set("body.deleteConfirm","false")}){Text("취소")}})
+    }
 }
 
 @Composable private fun BodyHistory(ui: PreviewSession) {
@@ -543,7 +572,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
     }.sortedByDescending { it.first }
     UiCard {
         KeyValue("날짜", "${if (waist) "허리둘레" else "체중"} $unit")
-        val rows = recorded.ifEmpty { listOf(LocalDate.now().minusDays(1) to if (waist) "80.0" else "83.2", LocalDate.now().minusDays(2) to if (waist) "80.2" else "83.3") }
+        val rows = recorded.ifEmpty { listOf(ui.today().minusDays(1) to if (waist) "80.0" else "83.2", ui.today().minusDays(2) to if (waist) "80.2" else "83.3") }
         rows.take(14).forEach { (date, value) ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(date.format(DateTimeFormatter.ofPattern("MM.dd")), Modifier.weight(1f), color = Muted)
@@ -565,7 +594,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
 @Composable private fun Steps(ui: PreviewSession) {
     UiCard {
         val date = selectedHomeDate(ui)
-        MutedText("${date.monthValue}월 ${date.dayOfMonth}일 · ${if (date == LocalDate.now()) "오늘" else "선택한 날"}")
+        MutedText("${date.monthValue}월 ${date.dayOfMonth}일 · ${if (date == ui.today()) "오늘" else "선택한 날"}")
         HeroNumber("6,240", "걸음")
         MutedText("샘플 걸음 기록 · 건강 데이터 연동 전")
         UiButton("새 기록 확인", { ui.notify("건강 데이터 연결 전이라 새 걸음을 가져올 수 없어요. 현재 수치는 샘플이에요.") }, primary = false)
@@ -587,7 +616,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
             ui.set("condition.draftDate", date.toString())
         }
     }
-    if (date != LocalDate.now()) MutedText("${date.year}년 ${date.monthValue}월 ${date.dayOfMonth}일의 컨디션")
+    if (date != ui.today()) MutedText("${date.year}년 ${date.monthValue}월 ${date.dayOfMonth}일의 컨디션")
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFE4EDD9)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text("오늘의 상태", color = Color(0xFF486A30), style = MaterialTheme.typography.labelMedium)
         Text(if (ui.get("condition.fatigue").isBlank() && ui.get("condition.sleep").isBlank()) "기억하고 싶은 항목만 남겨주세요." else conditionSummary(ui), fontWeight = FontWeight.Bold)
@@ -676,11 +705,11 @@ private fun roundedInches(cm: Double) = roundInt(cm / 2.54 * 10) / 10.0
 private fun formatInt(value: Int) = String.format(Locale.US, "%,d", value)
 private fun roundInt(value: Double) = floor(value + .5).toInt()
 private fun number(ui: PreviewSession, key: String, fallback: String = "0") = ui.get(key, fallback).toDoubleOrNull() ?: 0.0
-private fun selectedHomeDate(ui: PreviewSession) = runCatching { LocalDate.parse(ui.get("home.date", LocalDate.now().toString())) }.getOrDefault(LocalDate.now())
-private fun bodyDate(ui: PreviewSession) = runCatching { LocalDate.parse(ui.get("body.date", LocalDate.now().toString())) }.getOrDefault(LocalDate.now()).coerceAtLeast(earliestRecordDate)
+private fun selectedHomeDate(ui: PreviewSession) = runCatching { LocalDate.parse(ui.get("home.date", ui.today().toString())) }.getOrDefault(ui.today())
+private fun bodyDate(ui: PreviewSession) = runCatching { LocalDate.parse(ui.get("body.date", ui.today().toString())) }.getOrDefault(ui.today()).coerceAtLeast(earliestRecordDate)
 private fun finishTargets(ui: PreviewSession) {
     val returnRoute = ui.get("onboardingReturnRoute")
-    if (returnRoute.isNotBlank()) { ui.set("onboardingReturnRoute", ""); ui.save(returnRoute) }
+    if (returnRoute.isNotBlank()) { ui.set("onboardingReturnRoute", ""); if(ui.accountMode)ui.go(returnRoute)else ui.save(returnRoute) }
     else ui.go("A08")
 }
 private fun updateHeight(ui: PreviewSession) {
@@ -695,7 +724,7 @@ private fun basicsError(ui: PreviewSession): String? {
     val waist = ui.get("onb.waistCm").toDoubleOrNull()
     // Technical input bounds, not medical recommendations.
     return when {
-        age == null || age !in 1..120 -> "나이를 1~120세 사이의 숫자로 입력해주세요."
+        age == null || age !in (if(ui.accountMode)19..120 else 1..120) -> if(ui.accountMode)"현재 가입은 만 19~120세 범위에서 지원해요."else"나이를 1~120세 사이의 숫자로 입력해주세요."
         !height.isFinite() || height <= 0 || height > 300 -> "키를 0보다 크고 300cm 이하로 입력해주세요."
         !weight.isFinite() || weight <= 0 || weight > 1000 -> "체중을 0보다 크고 1,000kg 이하로 입력해주세요."
         ui.get("onb.waistCm").isNotBlank() && (waist == null || !waist.isFinite() || waist <= 0 || waist > 500) -> "허리둘레를 확인하거나 빈칸으로 남겨주세요."
@@ -703,17 +732,18 @@ private fun basicsError(ui: PreviewSession): String? {
         else -> null
     }
 }
-private fun prepareBody(ui: PreviewSession, date: LocalDate) {
+internal fun prepareBody(ui: PreviewSession, date: LocalDate) {
     ui.set("body.date", date.toString()); ui.set("body.dateText", date.toString())
-    ui.set("body.dateChoice", when (date) { LocalDate.now() -> "오늘"; LocalDate.now().minusDays(1) -> "어제"; else -> "직접 선택" })
+    ui.set("body.dateChoice", when (date) { ui.today() -> "오늘"; ui.today().minusDays(1) -> "어제"; else -> "직접 선택" })
     ui.set("body.draftWeight", ui.get("body.$date.weight")); ui.set("body.draftWaist", ui.get("body.$date.waist"))
     ui.set("body.draftWeightLb", converted(ui.get("body.$date.weight"), 2.2046226218))
     ui.set("body.draftWaistIn", converted(ui.get("body.$date.waist"), 1 / 2.54))
     ui.set("body.draftMemo", ui.get("body.$date.memo")); ui.set("body.error", "")
+    ui.set("body.draftVersion",ui.get("body.$date.version"))
 }
 private fun saveBody(ui: PreviewSession) {
     val date = bodyDate(ui)
-    if (date !in earliestRecordDate..LocalDate.now()) { ui.notify("1900년부터 오늘까지의 측정값을 기록해주세요."); return }
+    if (date !in earliestRecordDate..ui.today()) { ui.notify("1900년부터 오늘까지의 측정값을 기록해주세요."); return }
     val result = BodyMeasurementInput.validate(date, ui.get("body.draftWeight"), ui.get("body.draftWaist"))
     val measurement = result.measurement
     if (measurement == null) { ui.set("body.error", listOfNotNull(result.formError, result.weightError, result.waistError).joinToString("\n")); return }
@@ -724,7 +754,7 @@ private fun saveBody(ui: PreviewSession) {
 }
 private fun saveCondition(ui: PreviewSession) {
     val date = selectedHomeDate(ui)
-    if (date !in earliestRecordDate..LocalDate.now()) { ui.notify("1900년부터 오늘까지의 컨디션을 기록해주세요."); return }
+    if (date !in earliestRecordDate..ui.today()) { ui.notify("1900년부터 오늘까지의 컨디션을 기록해주세요."); return }
     conditionFields.forEach { ui.set("condition.$date.$it", ui.get("condition.$it")) }
     ui.set("condition.$date.saved", conditionFields.any { ui.get("condition.$it").isNotBlank() }.toString())
     ui.set("condition.date", date.toString())

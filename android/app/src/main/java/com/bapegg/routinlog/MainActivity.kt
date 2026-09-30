@@ -10,6 +10,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.bapegg.routinlog.data.SystemStatusRepository
 import com.bapegg.routinlog.ui.RoutineLogApp
 import com.bapegg.routinlog.ui.RoutineLogViewModel
+import com.bapegg.routinlog.ui.AccountViewModel
+import com.bapegg.routinlog.data.AccountRepository
 import com.bapegg.routinlog.ui.theme.RoutineLogTheme
 
 class MainActivity : ComponentActivity() {
@@ -20,11 +22,16 @@ class MainActivity : ComponentActivity() {
             initializer {
                 RoutineLogViewModel(SystemStatusRepository.create(BuildConfig.API_BASE_URL, BuildConfig.DEBUG))
             }
+            initializer {
+                AccountViewModel(AccountRepository.create(applicationContext, BuildConfig.API_BASE_URL,
+                    BuildConfig.DEBUG, BuildConfig.GOOGLE_WEB_CLIENT_ID))
+            }
         }
         setContent {
             RoutineLogTheme {
                 val model: RoutineLogViewModel = viewModel(factory = factory)
-                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null)
+                val account: AccountViewModel = viewModel(factory = factory)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account)
             }
         }
     }
