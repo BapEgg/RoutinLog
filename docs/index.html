@@ -29,6 +29,7 @@
       <h1 id="hero-title">기록은 간단하게.<br>나의 변화는 함께 보이게.</h1>
       <p class="intro">한 번 정한 식사와 운동에서 달라진 것만 기록하고,<br>한 주의 계획과 실제를 나란히 살펴보는 앱입니다.</p>
       <div class="tags"><span class="tag">Android 전용</span><span class="tag">Google 로그인 예정</span><span class="tag">온라인 기록</span></div>
+      <div class="doc-links"><a href="android-preview.html">실제 Android 67개 화면 보기 →</a></div>
     </div>
     <div class="hero-art" aria-hidden="true">
       <svg class="phone-art" viewBox="0 0 244 304" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -41,20 +42,20 @@
       </svg>
     </div>
   </section>
-  <aside class="notice" aria-label="현재 개발 단계"><span class="dot" aria-hidden="true"></span><div><strong>지금은 앱과 서버의 기반을 만드는 단계입니다.</strong><p>샘플 화면과 일부 계산·보안 코드는 준비됐습니다. 실제 로그인, 개인 기록 저장, 주간 리포트·AI는 앞으로 연결합니다.</p></div></aside>
+  <aside class="notice" aria-label="현재 개발 단계"><span class="dot" aria-hidden="true"></span><div><strong>기존 디자인 67개 화면을 Android 앱으로 옮겼습니다.</strong><p>식사량·세트·컨디션 입력과 화면 전환을 체험할 수 있습니다. 현재 값은 메모리에만 있으며, 실제 로그인·개인 기록 저장·주간 집계·AI는 이후 서버에 연결합니다.</p></div></aside>
 
   <section id="status" class="section" aria-labelledby="status-title">
-    <div class="section-head"><div class="section-title-row"><h2 id="status-title">어디까지 확인했나요?</h2><span class="small muted" data-status="updated-at">2026년 9월 30일 기준</span></div><p>‘코드가 있음’, ‘테스트 통과’, ‘휴대폰에서 확인’을 구분합니다.</p></div>
+    <div class="section-head"><div class="section-title-row"><h2 id="status-title">어디까지 확인했나요?</h2><span class="small muted" data-status="updated-at">2026년 9월 30일 기준</span></div><p>67개 화면을 실제 Android 앱에서 확인했습니다. 개인 기록의 서버 연결과 실기기 검증은 다음 단계입니다.</p></div>
     <!-- Update these data-status nodes only after checking the corresponding command output. -->
     <div class="status-grid">
       <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>서버 자동 테스트</div><strong data-status="server-tests">19개 통과</strong><p data-status="server-tests-detail">영양 계산 8 · 보안 7 · 스키마 4. H2 테스트 DB 기준입니다.</p></article>
-      <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>Android 앱 빌드</div><strong data-status="android-build">APK 생성 · 검사 통과</strong><p data-status="android-build-detail">Android 36 SDK 설치 완료. 입력 테스트 7개와 Lint가 통과했습니다. 실기기는 확인 전입니다.</p></article>
+      <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>Android 앱 빌드</div><strong data-status="android-build">67개 화면 · 에뮬레이터 확인</strong><p data-status="android-build-detail">단위 테스트 18개·UI 흐름 테스트 5개·Lint 통과. API 36 에뮬레이터 기준이며 실기기는 확인 전입니다.</p></article>
       <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>Docker 엔진</div><strong data-status="docker-engine">실행 확인 · 29.6.2</strong><p data-status="docker-engine-detail">DB를 실행할 도구가 준비됐다는 뜻입니다.</p></article>
       <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>실제 PostgreSQL</div><strong data-status="postgres">실제 DB 연결 확인</strong><p data-status="postgres-detail">PostgreSQL 17.11 · Flyway 적용 · 서버 UP · 비인가 요청 401을 확인했습니다.</p></article>
       <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>원격 저장소</div><strong data-status="remote-push">main 첫 푸시 완료</strong><p data-status="remote-push-detail"><a href="https://github.com/BapEgg/RoutinLog/commit/d2056bf7597df37477cb89ef1725c8bf513df721">초기 코드 d2056bf</a>를 반영했습니다. 스토어 배포와는 별개입니다.</p></article>
       <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>GitHub 자동 검증</div><strong data-status="ci">서버 · Android 모두 통과</strong><p data-status="ci-detail"><a href="https://github.com/BapEgg/RoutinLog/actions/runs/36681071379">코드 5778df9 검증 결과</a>. 서버 테스트·실제 DB 기동과 앱 빌드·테스트·Lint가 통과했습니다.</p></article>
     </div>
-    <p class="status-foot">실제 휴대폰·Google 인증·건강 데이터 권한·배터리·TalkBack·운영 배포는 후속 검증입니다. <a href="VERIFICATION.md">자세한 검증 기록</a></p>
+    <p class="status-foot">현재 로컬 검증은 단위 테스트 18개·에뮬레이터 UI 테스트 5개입니다. 원격 CI는 표시된 커밋 기준입니다. 실제 휴대폰·Google 인증·건강 권한·배터리·TalkBack·운영 배포는 후속 검증입니다. <a href="VERIFICATION.md">현재 결과와 초기 기반 이력 보기</a></p>
   </section>
 
   <section id="architecture" class="section" aria-labelledby="architecture-title">
@@ -64,7 +65,7 @@
         <div class="core-flow">
           <div class="arch-node main">
             <svg class="node-picture" viewBox="0 0 80 80" aria-hidden="true"><rect x="20" y="5" width="40" height="70" rx="9" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 14h16M34 66h12M29 29h22M29 40h14M29 51h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-            <h3>Android 앱</h3><p class="node-sub">내가 보고 누르는 화면</p><span class="node-tech">Kotlin · Compose</span><span class="node-badge">샘플 화면 작성</span>
+            <h3>Android 앱</h3><p class="node-sub">내가 보고 누르는 화면</p><span class="node-tech">Kotlin · Compose</span><span class="node-badge">67개 화면 구현 · 임시 편집</span>
           </div>
           <div class="flow-arrow"><span>입력 / 결과</span><b aria-hidden="true">↔</b><span>HTTPS</span></div>
           <div class="arch-node">
@@ -126,7 +127,7 @@
     </div>
     <details><summary>ViewModel·API·SDK·APK도 무엇인지 알고 싶다면</summary><div class="details-body">
       <div class="table-wrap"><table><thead><tr><th scope="col">이름</th><th scope="col">쉽게 말하면</th><th scope="col">루틴로그에서</th></tr></thead><tbody>
-        <tr><th scope="row">ViewModel · StateFlow</th><td>화면의 입력·로딩·오류 상태를 관리하고 변화시킵니다.</td><td>회전해도 입력을 유지하고, 저장 중에는 중복 버튼 입력을 막습니다.</td></tr>
+        <tr><th scope="row">ViewModel · 화면 상태</th><td>화면의 입력·로딩·오류 상태를 관리하고 변화시킵니다.</td><td>현재 화면 입력은 회전 중 유지되지만, 앱 프로세스가 종료되면 초기화됩니다.</td></tr>
         <tr><th scope="row">API · Retrofit · OkHttp</th><td>앱과 서버가 주고받는 약속, 그 통신을 돕는 도구입니다.</td><td>현재는 개발 화면에서 서버 상태를 조회합니다.</td></tr>
         <tr><th scope="row">Coroutines</th><td>통신을 기다리는 동안 화면이 멈추지 않게 일을 나눕니다.</td><td>요청 중 표시와 실패 안내를 화면 상태로 전달합니다.</td></tr>
         <tr><th scope="row">SDK · Gradle</th><td>Android 제작 도구 모음과 빌드 실행 도구입니다.</td><td>소스 코드를 휴대폰에서 실행할 형태로 만듭니다.</td></tr>
@@ -151,8 +152,8 @@
   </section>
 
   <section id="start" class="section" aria-labelledby="start-title">
-    <div class="section-head"><span class="section-index">실행 안내</span><h2 id="start-title">화면 보기와 코드 실행은 다릅니다.</h2><p>화면만 보려면 디자인 시안을 열고, 실제 앱 빌드는 Android 도구를 사용합니다.</p></div>
-    <div class="doc-links" style="margin:0 0 20px"><a href="../design-reference/index.html">67개 화면 시안 열기 ↗</a><a href="ARCHITECTURE.md">전체 아키텍처 보기</a></div>
+    <div class="section-head"><span class="section-index">실행 안내</span><h2 id="start-title">화면 보기와 코드 실행은 다릅니다.</h2><p>구현 결과는 Android 캡처로 보고, 직접 입력하려면 앱을 빌드해 설치합니다.</p></div>
+    <div class="doc-links" style="margin:0 0 20px"><a href="android-preview.html">Android 67개 화면 캡처 ↗</a><a href="../design-reference/index.html">원본 HTML 디자인 시안 ↗</a><a href="ARCHITECTURE.md">전체 아키텍처 보기</a></div>
 
     <details><summary>먼저 준비할 도구와 저장소 위치</summary><div class="details-body">
       <p>Windows PowerShell 기준입니다. 서버는 JDK 21, Android는 JDK 17 이상(현재 환경 21), DB는 실행 중인 Docker Desktop이 필요합니다. Gradle은 저장소의 Wrapper가 준비합니다.</p>
@@ -196,14 +197,17 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/system/status</code></pre>
       <pre><code>adb reverse tcp:8080 tcp:8080
 .\android\gradlew.bat -p android :app:installDebug -Proutinlog.debugApiBaseUrl=http://localhost:8080/</code></pre>
       <p>기기를 개발용으로 연결·승인한 뒤 실행합니다. HTTP 예외는 Debug의 에뮬레이터·localhost에만 허용하며, 다른 개발 주소는 HTTPS를 사용합니다.</p>
-      <div class="inline-note">현재 앱의 샘플은 메모리에만 있습니다. 화면 회전 중에는 입력을 유지하지만 체험 종료·프로세스 종료 시 초기화됩니다. 실제 로그인·저장·식단·운동 편집·건강 연동은 아직 제공하지 않습니다.</div>
+      <div class="inline-note">현재 앱은 Kotlin Compose로 옮긴 67개 화면에서 식단·운동·컨디션을 임시 편집할 수 있습니다. 화면 회전 중에는 입력을 유지하지만 프로세스 종료 시 초기화됩니다. Google 로그인·실제 계정 저장·건강 데이터·사진 OCR·AI는 아직 연결 전입니다. 상단 ‘화면 목록’에서 전체 흐름과 개발 서버 연결 확인을 열 수 있습니다.</div>
     </div></details>
 
     <details><summary>3. 테스트 결과를 확인하고 한계를 구분하기</summary><div class="details-body">
       <pre><code>.\server\gradlew.bat -p server test bootJar
-.\android\gradlew.bat -p android :app:testDebugUnitTest :app:lintDebug</code></pre>
+.\android\gradlew.bat -p android :app:testDebugUnitTest :app:lintDebug
+# 실행 중인 테스트 에뮬레이터가 있을 때
+.\android\gradlew.bat -p android :app:connectedDebugAndroidTest</code></pre>
       <p>서버 실행 JAR는 <code>server/build/libs/</code>, 서버 테스트 보고서는 <code>server/build/reports/tests/test/index.html</code>에 생성됩니다.</p>
-      <ul><li>서버 19개 테스트는 영양 비례 계산·null·범위, 보안 접근 차단, Flyway 스키마·JPA 매핑과 제약을 확인합니다.</li><li>서버의 로컬 자동 테스트 DB는 H2의 PostgreSQL 호환 모드입니다. 실제 PostgreSQL에서의 기동·마이그레이션 검증은 별도입니다.</li><li>Android 입력 테스트 7개는 null, 빈 입력, 잘못된 숫자·정밀도, 소수점 쉼표·날짜, 상한 포함과 초과를 확인합니다.</li><li>체중 1,000kg·허리 500cm의 상한은 서버 저장 범위와 맞춘 기술적 제한이며 의학적 권고가 아닙니다.</li><li>자동 검사 통과와 실제 기기 사용성 검증은 다릅니다. TalkBack·큰 글씨·키보드·뒤로가기·통신 실패·백그라운드 복귀·배터리를 따로 확인합니다.</li></ul>
+      <ul><li>서버 19개 테스트는 영양 비례 계산·null·범위, 보안 접근 차단, Flyway 스키마·JPA 매핑과 제약을 확인합니다.</li><li>서버의 로컬 자동 테스트 DB는 H2의 PostgreSQL 호환 모드입니다. 실제 PostgreSQL 기동·마이그레이션도 초기 기반 단계에서 따로 확인했습니다.</li><li>Android 단위 테스트 18개: 측정 입력 7개, 화면 상태·뒤로가기 4개, 식품량·누락값·레시피 계산 7개입니다.</li><li>API 36 에뮬레이터 UI 테스트 5개: 67개 화면 열기·돌아가기, 게스트 탭 이동, 음식량 변경, 필수 동의, 세트 완료→휴식→다음 세트를 확인했습니다.</li><li>체중 1,000kg·허리 500cm의 상한은 서버 저장 범위와 맞춘 기술적 제한이며 의학적 권고가 아닙니다.</li><li>에뮬레이터 검사와 실기기 검증은 다릅니다. 실제 TalkBack 사용·배터리·건강 권한·인증·네트워크 저장은 서버 연결 이후 따로 확인합니다.</li></ul>
+      <p>API 36 에뮬레이터에서 위 UI 명령을 실행해 5개 테스트를 통과했고 67개 화면을 캡처했습니다. ATD 테스트 이미지에서 화면 캡처가 검다면 테스트 기기에만 <code>adb shell setprop debug.hwui.drawing_enabled true</code>를 적용하고 앱을 다시 엽니다.</p>
       <p>최신 성공·실패·미확인 상태는 이 페이지 상단과 <a href="VERIFICATION.md">검증 기록</a>을 봅니다. CI 파일 작성과 원격 CI 실행 통과도 구분합니다.</p>
     </div></details>
 
@@ -227,7 +231,7 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/system/status</code></pre>
 
     <details><summary>디자인 시안·폰트·이미지의 사용 범위</summary><div class="details-body">
       <p><a href="../design-reference/index.html">디자인 기준 시안</a>은 2026년 9월 30일 보존한 67개 HTML 화면입니다. 같은 폴더의 assets와 함께 열며 실제 Android 앱이나 서버 연동 화면은 아닙니다.</p>
-      <ul><li>실버 배경·차콜 카드·짙은 블루 실행 버튼·은은한 연두 선택/완료·빨강 오류를 앱에 옮깁니다.</li><li>과거 시안의 Naver·iOS 설명은 현재 구현 범위가 아닙니다. 현재 기준은 Android·Google·온라인 기록입니다.</li><li>가상 날짜·수치를 실제 기록으로 초기화하지 않습니다. 제품 사진·검수 운동 영상·3D 모델도 시안으로 확보된 것이 아닙니다.</li><li>Android 폰트는 현재 시스템 sans-serif입니다. 웹용 SUIT woff2를 Android 폰트로 사용하지 않으며, 추후 TTF/OTF와 라이선스를 확인합니다.</li><li>웹 시안 자산의 <a href="../design-reference/assets/SUIT-LICENSE.txt">SUIT 라이선스</a>와 <a href="../design-reference/assets/LUCIDE-LICENSE.txt">Lucide 라이선스</a>를 함께 보존합니다.</li></ul>
+      <ul><li>실버 배경·차콜 카드·짙은 블루 실행 버튼·은은한 연두 선택/완료·빨강 오류를 Android 앱에 적용했습니다.</li><li>과거 시안의 Naver·iOS 설명은 현재 구현 범위가 아닙니다. 현재 기준은 Android·Google·온라인 기록입니다.</li><li>가상 날짜·수치를 실제 기록으로 초기화하지 않습니다. 제품 사진·검수 운동 영상·3D 모델도 시안으로 확보된 것이 아닙니다.</li><li>Android는 로컬 SUIT TTF 4개 굵기(400·500·600·700)를 Compose 테마에 적용했습니다. 초기 시스템 글꼴을 교체했으며, 웹용 woff2를 Android에서 직접 읽지 않습니다.</li><li><a href="../android/app/src/main/assets/licenses/SUIT-LICENSE.txt">Android SUIT 라이선스</a>와 <a href="../android/app/src/main/assets/licenses/LUCIDE-LICENSE.txt">Lucide 라이선스</a>를 앱에 동봉합니다. 원본 HTML 시안의 자산·라이선스도 별도로 보존합니다.</li></ul>
       <p>이 안내서는 외부 폰트·CDN·이미지를 불러오지 않으며 시스템 글꼴과 자체 SVG를 사용합니다. 인터넷이 없어도 파일을 브라우저에서 열어 읽을 수 있습니다.</p>
     </div></details>
   </section>
@@ -249,8 +253,8 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/system/status</code></pre>
     { label:'오늘 체중 · 화면 예시', value:'83.2', unit:'kg', note:'평소 값에서 달라진 숫자만 바꿉니다.', title:'휴대폰에서 달라진 값을 적습니다.', description:'체중이나 허리둘레를 입력합니다. 측정하지 않은 항목은 비워둘 수 있습니다.', availability:'현재: 샘플 입력 화면에서만 반영됩니다. 계정이나 서버에 저장되지 않습니다.' },
     { label:'서버에서 확인할 것', value:'내 기록인가?', unit:'', note:'로그인 · 단위 · 값의 범위 · 요청 중복을 확인합니다.', title:'서버가 소유자와 입력을 확인합니다.', description:'남의 기록에 접근하지 못하게 하고, 숫자와 단위가 유효한지 확인합니다. 재시도도 같은 요청으로 구분합니다.', availability:'현재: 개인 API 기본 차단과 일부 계산·제약 테스트가 있습니다. 실제 로그인·저장 검증 연결은 예정입니다.' },
     { label:'따로 남기는 두 가지', value:'계획 / 실제', unit:'', note:'그날 목표와 실제 측정·섭취·수행 값을 함께 보존합니다.', title:'당시 계획과 실제 기록을 따로 저장합니다.', description:'계획을 나중에 바꿔도 지난 기록을 덮어쓰지 않습니다. 서버가 저장 결과를 돌려줘야 완료로 표시합니다.', availability:'현재: 사용자·Google 식별자·신체 기록의 초기 DB 구조만 있습니다. 개인 기록 저장 API는 예정입니다.' },
-    { label:'지난주 비교의 예시', value:'목표 ↔ 실제', unit:'', note:'빠진 기록은 0으로 채우지 않습니다.', title:'한 주의 숫자와 기록 범위를 묶습니다.', description:'그날 적용된 목표와 실제 영양·몸·운동·걸음을 비교합니다. 자료가 적으면 판단할 수 있는 범위도 함께 표시합니다.', availability:'현재: 실제 주간 집계는 아직 없습니다. HTML 시안의 리포트 숫자는 가상 예시입니다.' },
-    { label:'마지막 결정권자', value:'사용자', unit:'', note:'적용 · 직접 수정 · 보류 중 선택합니다.', title:'제안을 고르면 새 계획으로 이어집니다.', description:'AI는 검토된 근거와 내 기록으로 변경 초안을 설명합니다. 내가 확정한 내용만 다음 계획에 반영합니다.', availability:'현재: AI 연결·제안 검증·결정 이력 저장은 후속 구현입니다. 지난주 칼로리 차이를 다음 주에 몰아 보상하지 않습니다.' }
+    { label:'지난주 비교의 예시', value:'목표 ↔ 실제', unit:'', note:'빠진 기록은 0으로 채우지 않습니다.', title:'한 주의 숫자와 기록 범위를 묶습니다.', description:'그날 적용된 목표와 실제 영양·몸·운동·걸음을 비교합니다. 자료가 적으면 판단할 수 있는 범위도 함께 표시합니다.', availability:'현재: Android 리포트 화면은 구현했고 숫자는 가상 예시입니다. 실제 기록의 주간 집계는 후속 연결입니다.' },
+    { label:'마지막 결정권자', value:'사용자', unit:'', note:'적용 · 직접 수정 · 보류 중 선택합니다.', title:'제안을 고르면 새 계획으로 이어집니다.', description:'AI는 검토된 근거와 내 기록으로 변경 초안을 설명합니다. 내가 확정한 내용만 다음 계획에 반영합니다.', availability:'현재: 선택·수정 화면은 임시 값으로 작동합니다. AI 생성·근거 검증·이력 저장은 후속 구현이며, 지난주 칼로리 차이를 몰아 보상하지 않습니다.' }
   ];
   const tabs = [...document.querySelectorAll('[data-step]')];
   const panel = document.getElementById('step-panel');

@@ -1,237 +1,122 @@
 package com.bapegg.routinlog.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bapegg.routinlog.BuildConfig
-import com.bapegg.routinlog.ui.theme.Border
-import com.bapegg.routinlog.ui.theme.Celery
-import com.bapegg.routinlog.ui.theme.Charcoal
-import com.bapegg.routinlog.ui.theme.Ink
-import com.bapegg.routinlog.ui.theme.Muted
-import com.bapegg.routinlog.ui.theme.Silver
+import com.bapegg.routinlog.ui.screens.*
+import com.bapegg.routinlog.ui.theme.*
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
-@Composable
-fun RoutineLogApp(model: RoutineLogViewModel) {
-    val state by model.state.collectAsStateWithLifecycle()
-    BackHandler(enabled = state.screen != AppScreen.WELCOME, onBack = model::back)
-    Scaffold(containerColor = Silver) { insets ->
-        Box(Modifier.fillMaxSize().padding(insets).imePadding(), contentAlignment = Alignment.TopCenter) {
-            key(state.screen) {
-                Column(
-                    Modifier.widthIn(max = 560.dp).fillMaxWidth().verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    when (state.screen) {
-                        AppScreen.WELCOME -> WelcomeScreen(model)
-                        AppScreen.SAMPLE_HOME -> SampleHome(state, model)
-                        AppScreen.SAMPLE_BODY -> SampleBody(state, model)
-                        AppScreen.DEBUG_STATUS -> if (BuildConfig.DEBUG) DebugStatus(state, model)
-                    }
-                    Spacer(Modifier.height(12.dp))
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null) {
+    val ui:PreviewSession=viewModel()
+    val connection by model.state.collectAsStateWithLifecycle()
+    var catalog by remember { mutableStateOf(false) }
+    val snackbar=remember { SnackbarHostState() }
+    LaunchedEffect(initialRoute){if(BuildConfig.DEBUG && initialRoute in ScreenCatalog){ui.previewMode=true;ui.go(initialRoute!!)}}
+    LaunchedEffect(ui.message){ui.message?.let {snackbar.showSnackbar(it);ui.message=null}}
+    BackHandler(enabled=ui.route!="A01"){ui.back()}
+    val sheet=ui.route in listOf("F04","R06")
+    val base=if(sheet)ScreenCatalog.getValue(ui.route).back!! else ui.route
+    val keyboard=WindowInsets.ime.getBottom(LocalDensity.current)>0
+    Scaffold(containerColor=Silver,snackbarHost={SnackbarHost(snackbar)},topBar={
+        Column(Modifier.statusBarsPadding()) {
+            if(ui.previewMode || BuildConfig.DEBUG)Row(Modifier.fillMaxWidth().background(Color(0xFFE4EAEF)).padding(start=20.dp,end=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                Text(if(ui.previewMode)"샘플 체험 · 실제 기록은 저장되지 않아요" else "디자인 구현 확인",Modifier.weight(1f),fontSize=11.sp,color=Muted)
+                if(BuildConfig.DEBUG)TextButton(onClick={catalog=true},contentPadding=PaddingValues(horizontal=10.dp,vertical=0.dp),modifier=Modifier.heightIn(min=40.dp)){Text("화면 목록",fontSize=11.sp)}
+            }
+            ScreenHeader(base,ui)
+        }
+    },bottomBar={if(!keyboard)Column(Modifier.navigationBarsPadding().background(Color(0xFFF8FAFC))) {
+        if(hasFooter(base))Column(Modifier.padding(horizontal=20.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){ScreenFooter(base,ui)}
+        if(ScreenCatalog[base]?.tab?.isNotBlank()==true)AppTabs(base,ui)
+    }}) {padding->
+        Box(Modifier.fillMaxSize().padding(padding).imePadding(),contentAlignment=Alignment.TopCenter) {
+            AnimatedContent(targetState=base,label="screen",transitionSpec={fadeIn() togetherWith fadeOut()}) {id->
+                Column(Modifier.widthIn(max=600.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=14.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                    ScreenContent(id,ui);Spacer(Modifier.height(8.dp))
                 }
             }
         }
     }
-}
-
-@Composable
-private fun WelcomeScreen(model: RoutineLogViewModel) {
-    Text("루틴로그", style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(24.dp))
-    Text("매일의 기록이\n나의 루틴이 되도록.", style = MaterialTheme.typography.headlineLarge,
-        modifier = Modifier.semantics { heading() })
-    Text("한 번 설정하고, 달라진 것만.\n식사와 운동, 몸의 변화를 함께 기록해요.", color = Muted)
-    Surface(shape = RoundedCornerShape(24.dp), color = Charcoal, contentColor = Color.White) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("오늘의 작은 기록", color = Celery, style = MaterialTheme.typography.labelLarge)
-            Text("차곡차곡, 나를 알아가는 시간", style = MaterialTheme.typography.titleLarge)
-            Text("먹은 것 · 움직인 것 · 달라진 몸", color = Color(0xFFD1D9E2))
+    if(sheet)ModalBottomSheet(onDismissRequest={ui.back()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=Silver) {
+        Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically){Text(ScreenCatalog.getValue(ui.route).title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge);IconButton(onClick={ui.back()},modifier=Modifier.semantics{contentDescription="닫기"}){UiIcon("X")}}
+            ScreenContent(ui.route,ui);ScreenFooter(ui.route,ui);Spacer(Modifier.height(12.dp))
         }
     }
-    Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-        Text("Google 로그인 준비 중", textAlign = TextAlign.Center)
-    }
-    OutlinedButton(onClick = model::enterSample, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = Ink),
-        border = BorderStroke(1.dp, Border)) {
-        Text("샘플로 먼저 둘러보기", textAlign = TextAlign.Center)
-    }
-    Text("지금은 샘플 체험만 이용할 수 있어요.\n개인 기록을 보관하는 기능은 준비 중이에요.",
-        style = MaterialTheme.typography.bodyMedium, color = Muted, textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth())
-    if (BuildConfig.DEBUG) {
-        TextButton(onClick = model::openDebugStatus, modifier = Modifier.heightIn(min = 48.dp)) {
-            Text("개발 연결 확인")
+    if(catalog)AlertDialog(onDismissRequest={catalog=false},confirmButton={TextButton(onClick={catalog=false}){Text("닫기")}},title={Text("전체 화면 · ${ScreenCatalog.size}개")},text={
+        LazyColumn(Modifier.heightIn(max=530.dp)) {
+            item{Text("가상 데이터로 디자인과 화면 흐름을 확인해요.",color=Muted)}
+            item{TextButton(onClick=model::checkStatus,enabled=!connection.checkingStatus){Text("개발 서버 연결 확인")};Text(connection.statusMessage,fontSize=12.sp,color=Muted)}
+            items(ScreenCatalog.values.toList()){s->TextButton(onClick={catalog=false;ui.previewMode=true;ui.go(s.id)},modifier=Modifier.fillMaxWidth()){Text("${s.id}   ${s.title}",Modifier.fillMaxWidth(),color=Ink)}}
         }
+    })
+}
+@Composable private fun ScreenContent(id:String,ui:PreviewSession){when(id.first()){'A','H'->HomeScreens(id,ui);'F'->FoodScreens(id,ui);'W'->WorkoutScreens(id,ui);else->ReportScreens(id,ui)}}
+@Composable private fun ScreenFooter(id:String,ui:PreviewSession){when(id.first()){'A','H'->HomeFooter(id,ui);'F'->FoodFooter(id,ui);'W'->WorkoutFooter(id,ui);else->ReportFooter(id,ui)}}
+private fun hasFooter(id:String)=id !in setOf("A01","H01","H02","H03","H05","H06","F01","F02","F06","F08","R08","R09","S01","S03","S04","E02")
+@Composable private fun ScreenHeader(id:String,ui:PreviewSession) {
+    if(id=="A01")return
+    val screen=ScreenCatalog.getValue(id)
+    val step=if(id.startsWith("A"))id.drop(1).toInt()-1 else 0
+    val root=id in listOf("H01","F01","W01","R01")
+    Column(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        if(!root)Row(verticalAlignment=Alignment.CenterVertically) {
+            IconButton(onClick={ui.back()},modifier=Modifier.size(48.dp).offset(x=(-12).dp).semantics{contentDescription="뒤로 가기"}){UiIcon("ChevronLeft",tint=Ink)}
+            Text(when(id.first()){'A'->"시작 설정";'H'->"오늘의 기록";'F'->"식단";'W'->"운동";'R'->"주간 리포트";else->"설정"},Modifier.weight(1f),fontSize=12.sp,color=Muted)
+            if(step>0)Text("$step / 7",fontSize=12.sp,color=Muted)
+        }else Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                if(id=="H01")Text("나만의 루틴로그",color=Muted,fontSize=11.sp)
+                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",LocalDate.now().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else screen.title
+                Text(title,style=if(root)MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,modifier=Modifier.semantics{heading()}.then(if(id=="H01")Modifier.clickable{ui.go("H03")}else Modifier))
+                if(root&&id=="H01")Text("나의 일상을 차곡차곡",fontSize=12.sp,color=Muted)
+            }
+            if(root)Surface(shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Border),color=Color.White){IconButton(onClick={ui.go(if(id=="H01")"S01"else"H03")},modifier=Modifier.semantics{contentDescription=if(id=="H01")"설정"else"달력"}){UiIcon(if(id=="H01")"Settings"else"CalendarDays")}}
+        }
+        if(step>0)ProgressLine(step/7f)
+        Spacer(Modifier.height(4.dp))
     }
 }
-
-@Composable
-private fun SampleHome(state: RoutineLogUiState, model: RoutineLogViewModel) {
-    Header("오늘의 루틴", model::back)
-    SampleBanner()
-    Text(state.sampleBody.date.format(DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREAN)),
-        style = MaterialTheme.typography.titleLarge)
-    Surface(shape = RoundedCornerShape(24.dp), color = Charcoal, contentColor = Color.White) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("오늘 운동 · 예시", color = Celery, style = MaterialTheme.typography.labelLarge)
-            Text("하체 A", style = MaterialTheme.typography.headlineMedium)
-            Text("레그프레스 · 레그컬 · 카프레이즈", color = Color(0xFFD1D9E2))
-            Text("운동 기록은 준비 중이에요.", color = Color(0xFFD1D9E2), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                colors = ButtonDefaults.buttonColors(disabledContainerColor = Color(0xFF455367), disabledContentColor = Color.White)) {
-                Text("운동 시작 · 준비 중")
+@Composable private fun AppTabs(id:String,ui:PreviewSession) {
+    Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal=12.dp,vertical=7.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+        listOf(Triple("오늘","H01","House"),Triple("식단","F01","Utensils"),Triple("운동","W01","Dumbbell"),Triple("리포트","R01","ChartNoAxesCombined")).forEach{(label,to,icon)->
+            val active=id.first()==to.first()
+            Surface(onClick={ui.go(to)},modifier=Modifier.weight(1f).semantics{selected=active;role=Role.Tab},shape=RoundedCornerShape(12.dp),color=if(active)Color(0xFFEEF5E7)else Color(0xFFF2F5F9),border=BorderStroke(1.dp,if(active)Celery else Color(0xFFDCE3EB))) {
+                Column(Modifier.heightIn(min=50.dp).padding(vertical=5.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+                    Surface(shape=RoundedCornerShape(12.dp),color=if(active)Celery else Color.Transparent){Box(Modifier.width(46.dp).height(28.dp),contentAlignment=Alignment.Center){UiIcon(icon,tint=if(active)Ink else Muted)}}
+                    Text(label,fontSize=11.sp,color=if(active)Ink else Muted,fontWeight=if(active)FontWeight.SemiBold else FontWeight.Normal)
+                }
             }
         }
-    }
-    InfoCard {
-        Text("체중 · 허리", style = MaterialTheme.typography.titleMedium)
-        Text("${state.sampleBody.weightKg?.toPlainString() ?: "—"} kg", style = MaterialTheme.typography.headlineLarge)
-        Text("허리 ${state.sampleBody.waistCm?.toPlainString() ?: "—"} cm", color = Muted)
-        Button(onClick = model::openBody, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-            Text("측정값 입력해보기")
-        }
-    }
-    state.sampleNotice?.let { notice ->
-        Text(notice, style = MaterialTheme.typography.bodyMedium, color = Muted,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-    }
-    InfoCard {
-        Text("평소 먹는 식사 · 예시", style = MaterialTheme.typography.titleMedium)
-        Text("아침  그릭요거트 · 블루베리\n점심  현미밥 · 닭가슴살\n저녁  나의 기본 식사")
-        Text("식단 편집과 주간 리포트는 준비 중이에요.", color = Muted,
-            style = MaterialTheme.typography.bodyMedium)
-    }
-    OutlinedButton(onClick = model::endSample, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White), border = BorderStroke(1.dp, Border)) {
-        Text("체험 마치기")
-    }
-}
-
-@Composable
-private fun SampleBody(state: RoutineLogUiState, model: RoutineLogViewModel) {
-    Header("체중 · 허리 입력", model::back)
-    SampleBanner()
-    Text(state.sampleBody.date.format(DateTimeFormatter.ofPattern("M월 d일 · 오늘", Locale.KOREAN)), color = Muted)
-    Text("오늘의 변화를 남겨요.", style = MaterialTheme.typography.headlineMedium,
-        modifier = Modifier.semantics { heading() })
-    Text("측정한 항목만 입력해도 괜찮아요.", color = Muted)
-    MeasurementField("체중", "kg", state.weightInput, state.weightError, model::changeWeight)
-    MeasurementField("허리둘레", "cm", state.waistInput, state.waistError, model::changeWaist)
-    state.formError?.let { error ->
-        Text(error, color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-    }
-    Button(onClick = model::applySampleInput, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-        Text("체험 화면에 반영", textAlign = TextAlign.Center)
-    }
-    Text("입력한 값은 샘플 화면에서만 사용해요.\n서버나 기기에 실제 기록으로 저장하지 않아요.",
-        style = MaterialTheme.typography.bodyMedium, color = Muted, textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth())
-}
-
-@Composable
-private fun MeasurementField(label: String, unit: String, value: String, error: String?, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value, onValueChange = onChange, label = { Text(label) }, suffix = { Text(unit) },
-        modifier = Modifier.fillMaxWidth(), singleLine = true,
-        textStyle = MaterialTheme.typography.headlineMedium,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        isError = error != null, supportingText = { Text(error ?: "선택 · 소수점 한 자리까지") },
-        shape = RoundedCornerShape(16.dp),
-    )
-}
-
-@Composable
-private fun DebugStatus(state: RoutineLogUiState, model: RoutineLogViewModel) {
-    Header("개발 연결 확인", model::back)
-    InfoCard {
-        Text("Debug 전용", fontWeight = FontWeight.Bold)
-        Text("GET /api/v1/system/status", style = MaterialTheme.typography.bodyMedium)
-        Text(BuildConfig.API_BASE_URL.ifBlank { "주소 미설정" }, style = MaterialTheme.typography.bodyMedium)
-        Text(state.statusMessage, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-        if (state.checkingStatus) CircularProgressIndicator(Modifier.size(28.dp))
-        Button(onClick = model::checkStatus, enabled = !state.checkingStatus,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-            Text("서버 응답 확인")
-        }
-    }
-    Text("이 요청은 서버 상태만 확인합니다. 샘플 기록을 업로드하거나 Google 로그인 성공을 대신하지 않습니다.",
-        style = MaterialTheme.typography.bodyMedium, color = Muted)
-}
-
-@Composable
-private fun Header(title: String, onBack: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconButton(onClick = onBack, modifier = Modifier.size(48.dp).semantics { contentDescription = "뒤로 가기" }) {
-            Text("‹", fontSize = 32.sp)
-        }
-        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
-    }
-}
-
-@Composable
-private fun SampleBanner() {
-    Surface(shape = RoundedCornerShape(16.dp), color = Celery.copy(alpha = .34f)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("샘플 체험", fontWeight = FontWeight.SemiBold)
-            Text("가상 기록이에요. 체험을 마치면 초기화돼요.", style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
-
-@Composable
-private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = BorderStroke(1.dp, Border)) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }

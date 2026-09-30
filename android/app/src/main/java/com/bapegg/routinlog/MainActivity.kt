@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RoutineLogTheme {
                 val model: RoutineLogViewModel = viewModel(factory = factory)
-                RoutineLogApp(model)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null)
             }
         }
     }

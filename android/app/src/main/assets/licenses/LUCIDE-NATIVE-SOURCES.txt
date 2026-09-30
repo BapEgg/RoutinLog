@@ -1,0 +1,18 @@
+Official Lucide icons converted from SVG to Android VectorDrawable. Paths retain the official artwork; stroke width 1.7 matches existing app icons.
+License: LUCIDE-LICENSE.txt in this directory. Downloaded for this implementation; original SVG SHA-256 values below.
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bell.svg SHA256=394889E9631FE3A9A63BE9A479A95B451B708E432D895978D21D9130B5EE5DBE
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/chevron-down.svg SHA256=66EA878E72ED3488BB3B464C39DFDCCEE8D1F78E560DCCEA40E5E12DA0E87E87
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/chevron-up.svg SHA256=D09F13FCBEF3C493EAD7E4663B5EE91804FEC38D5EDB5E7CC3ACFBD547641CF4
+https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/clipboard-list.svg SHA256=2B91ABC2E8EE8BA4C2E0F77D506A47A7A9774B0D4DE3FA4B27E822A6376AB892
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/heart-pulse.svg SHA256=103D6B99AC9AB53C5861317673880AE5D6E2491EFA7A40E8B89ECAC449842DF2
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/log-out.svg SHA256=F24B5B45C05A3ACC346AF8095408F6BA197FF58EA1641A4F2CB25A9702D2C0AC
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/message-circle.svg SHA256=146F39740FE50844394D56AE1F8821937655BCFFF3842BF6FE8FFC0BCD324076
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/moon.svg SHA256=205B959E940D5841F0CE1D09C933153DA9D9C94130A54D5CC0C68C2AF1D403DA
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/pencil-line.svg SHA256=CD0814E0744B4A81F9CCB1D4DB9EE34DE0E11F2CF82FA1522A86A8056E065E00
+https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/refresh-cw.svg SHA256=2E10DD403C85A24F163D59FC6151AA21147FE9402E1305DFC8979208CAEE8944
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/settings-2.svg SHA256=06D06C191BD7EB28AFAF9D40ACB5C49EF69448FDEDA91801D9823D7C440A4E10
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-check.svg SHA256=8D4FCDBDE5BBA4ABB1A2F6FE53E37CEB6343A1D5449A9D88F6F97C1971D26C4E
+https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/trash-2.svg SHA256=E63698ACF757D3043FCB4A9EA6FFCEFF9DD84708707EAFC879C86B34A6FF2786
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/user-round.svg SHA256=84870F26F3FAF8DA45DA84174517519E81B9E8F00319C78954FCBB74F50038A1
+https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/wifi-off.svg SHA256=318B290106E55C3505933F434D3663524206C7A44165A89508774FBA4FDBAADD
+https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/wind.svg SHA256=EB35F6F00125B779A993C21EE761432FAF8FC3210272C94448F63E2196D419B7

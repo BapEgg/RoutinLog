@@ -7,8 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.bapegg.routinlog.R
 
 val Silver = Color(0xFFEDF0F3)
 val Charcoal = Color(0xFF242B35)
@@ -26,7 +28,8 @@ private val colors = lightColorScheme(
     surfaceVariant = Color(0xFFE3E9EF), onSurfaceVariant = Muted,
     outline = Border, error = Color(0xFFB93F3B),
 )
-private val typography = Typography(
+val Suit = FontFamily(Font(R.font.suit_400,FontWeight.Normal),Font(R.font.suit_500,FontWeight.Medium),Font(R.font.suit_600,FontWeight.SemiBold),Font(R.font.suit_700,FontWeight.Bold))
+private val baseTypography = Typography(
     headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 43.sp),
     headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 35.sp),
     titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 30.sp),
@@ -35,6 +38,13 @@ private val typography = Typography(
     bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 22.sp),
     labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 23.sp),
 )
+private val typography = baseTypography.let { t ->
+    t.copy(displayLarge=t.displayLarge.copy(fontFamily=Suit),displayMedium=t.displayMedium.copy(fontFamily=Suit),displaySmall=t.displaySmall.copy(fontFamily=Suit),
+        headlineLarge=t.headlineLarge.copy(fontFamily=Suit),headlineMedium=t.headlineMedium.copy(fontFamily=Suit),headlineSmall=t.headlineSmall.copy(fontFamily=Suit),
+        titleLarge=t.titleLarge.copy(fontFamily=Suit),titleMedium=t.titleMedium.copy(fontFamily=Suit),titleSmall=t.titleSmall.copy(fontFamily=Suit),
+        bodyLarge=t.bodyLarge.copy(fontFamily=Suit),bodyMedium=t.bodyMedium.copy(fontFamily=Suit),bodySmall=t.bodySmall.copy(fontFamily=Suit),
+        labelLarge=t.labelLarge.copy(fontFamily=Suit),labelMedium=t.labelMedium.copy(fontFamily=Suit),labelSmall=t.labelSmall.copy(fontFamily=Suit))
+}
 
 @Composable
 fun RoutineLogTheme(content: @Composable () -> Unit) {
