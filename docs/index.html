@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="루틴로그의 Android 앱, 서버, 데이터 저장과 다음 개발 단계를 그림으로 읽는 프로젝트 안내서">
+  <title>루틴로그 · 그림으로 보는 프로젝트 안내</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23242b35'/%3E%3Cpath d='M19 22v20m26-20v20M19 32h26' stroke='%23b8d99a' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root{font-size:16px;--bg:#edf0f3;--paper:#fff;--ink:#171a20;--muted:#536170;--charcoal:#242b35;--blue:#2453bf;--green:#b8d99a;--green-ink:#335329;--border:#c6cfd9;--quiet:#e3e9ef;--orange:#76551d;--radius:20px;--mono:Consolas,"SFMono-Regular",monospace}
+    *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:80px}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}a{color:var(--blue);text-underline-offset:4px}a:hover{text-decoration-thickness:2px}button{font:inherit;cursor:pointer}button:disabled{cursor:default}button,a,summary{-webkit-tap-highlight-color:transparent}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--blue);outline-offset:4px}h1,h2,h3,p,figure{margin:0}h1,h2,h3{line-height:1.3;letter-spacing:-.04em;text-wrap:balance}h1{font-size:clamp(2.15rem,5vw,3.5rem)}h2{font-size:clamp(1.5rem,3vw,2rem)}h3{font-size:1.1rem}p{max-width:70ch}.muted{color:var(--muted)}.small{font-size:.86rem}.eyebrow{font-size:.8rem;font-weight:700;letter-spacing:.08em;color:var(--muted)}.skip{position:absolute;top:-100px;left:16px;padding:12px 18px;background:white;z-index:20}.skip:focus{top:8px}.shell{width:min(1100px,calc(100% - 48px));margin:auto}.topbar{border-bottom:1px solid var(--border);background:var(--bg)}.topbar-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:76px}.brand{display:flex;align-items:center;gap:10px;font-weight:800;text-decoration:none;color:var(--ink);font-size:1.1rem}.brandmark{display:grid;place-items:center;background:var(--charcoal);color:var(--green);width:36px;height:36px;border-radius:11px;font-size:1.4rem}.nav{display:flex;gap:6px;flex-wrap:wrap}.nav a{display:inline-flex;align-items:center;min-height:44px;padding:8px 11px;color:var(--muted);font-size:.88rem;text-decoration:none}.nav a:hover{background:var(--quiet);border-radius:8px}.hero{padding:54px 0 30px;display:grid;grid-template-columns:minmax(0,1fr) 275px;gap:40px;align-items:center}.hero-copy{display:grid;gap:19px}.hero .intro{font-size:1.05rem;color:var(--muted)}.tags{display:flex;gap:8px;flex-wrap:wrap}.tag{display:inline-flex;align-items:center;padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:.79rem;font-weight:650;background:var(--paper)}.phone-art{width:244px;max-width:100%;margin:auto;filter:drop-shadow(0 12px 14px #242b3515)}.notice{display:flex;align-items:flex-start;gap:14px;padding:22px 24px;background:var(--charcoal);color:#fff;border-radius:var(--radius);margin:0 0 46px}.notice .dot{flex:none;width:9px;height:9px;background:var(--green);border-radius:50%;margin-top:10px}.notice strong{display:block;font-size:1.04rem;margin-bottom:5px}.notice p{font-size:.92rem;color:#d3dce5}.section{padding:0 0 54px}.section-head{display:grid;gap:10px;margin-bottom:24px}.section-head p{color:var(--muted);font-size:.96rem}.section-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}.section-index{display:inline-flex;gap:8px;align-items:center;font-size:.8rem;color:var(--muted);font-weight:700}.section-index::before{content:"";width:24px;height:2px;background:var(--blue)}.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.status-item{padding:19px 20px;border:1px solid var(--border);border-radius:14px;background:var(--paper);min-width:0}.status-label{font-size:.86rem;color:var(--muted);margin-bottom:7px}.status-item strong{display:block;font-size:1.06rem;margin-bottom:5px}.status-item p{font-size:.82rem;color:var(--muted)}.state-mark{display:inline-block;width:8px;height:8px;border-radius:50%;background:#98a5b2;margin-right:7px}.state-mark.pass{background:#598144}.state-mark.working{background:#b58a43}.status-foot{margin-top:13px;font-size:.85rem;color:var(--muted)}.architecture{padding:28px;background:var(--paper);border:1px solid var(--border);border-radius:24px}.core-flow{display:grid;grid-template-columns:minmax(0,1fr) 68px minmax(0,1fr) 68px minmax(0,1fr);align-items:center;gap:8px}.arch-node{border:1px solid var(--border);padding:23px 18px;border-radius:17px;text-align:center;display:grid;justify-items:center;gap:9px;min-width:0}.arch-node.main{background:var(--charcoal);color:#fff;border-color:var(--charcoal)}.arch-node.main .node-sub{color:#d2dce7}.node-picture{width:76px;height:76px;color:var(--blue)}.main .node-picture{color:var(--green)}.node-sub{color:var(--muted);font-size:.9rem}.node-tech{font-family:var(--mono);font-size:.76rem;color:var(--muted);word-break:normal}.main .node-tech{color:#d2dce7}.node-badge{padding:3px 8px;border-radius:6px;background:var(--quiet);font-size:.73rem;color:var(--muted)}.main .node-badge{background:#455164;color:white}.flow-arrow{display:grid;gap:4px;text-align:center;color:var(--muted);font-size:.7rem}.flow-arrow b{font-size:1.85rem;line-height:1.1;font-weight:400;color:var(--blue)}.branch{margin-top:23px;border-top:1px solid var(--border);padding-top:23px;display:grid;grid-template-columns:1fr 2fr;gap:20px;align-items:center}.branch-copy{font-size:.88rem;color:var(--muted)}.photo-node{display:flex;gap:13px;align-items:center;border:1px dashed #9daebe;border-radius:12px;padding:15px}.photo-node svg{flex:none;width:46px;height:46px;color:var(--blue)}.photo-node .small{color:var(--muted)}.future-strip{margin:20px 0 0;padding:24px;border:1px dashed #9daebe;border-radius:20px;background:#f5f7f9}.future-label{display:flex;gap:10px;align-items:center;margin-bottom:19px;font-size:.86rem;color:var(--muted)}.future-label span{font-size:.7rem;border:1px solid var(--border);padding:2px 6px;border-radius:4px;background:white}.future-flow{display:grid;grid-template-columns:minmax(0,1fr) 32px minmax(0,1fr) 32px minmax(0,1fr);align-items:center;gap:8px}.future-node{display:grid;gap:7px}.future-node .number{font:700 .76rem var(--mono);color:var(--blue)}.future-node p{font-size:.85rem;color:var(--muted)}.choice-pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.choice-pills span{font-size:.76rem;padding:4px 8px;border:1px solid var(--border);border-radius:7px;background:white}.choice-pills .apply{background:var(--green);border-color:var(--green);color:var(--ink)}.loop-note{margin-top:20px;background:var(--paper);border-radius:10px;padding:12px 15px;font-size:.85rem;border-left:3px solid var(--green)}figcaption{margin-top:15px;color:var(--muted);font-size:.87rem}.flow-demo{border:1px solid var(--border);border-radius:24px;overflow:hidden;background:var(--paper)}.step-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--border);padding:10px;background:#f6f8fa;gap:6px}.step-tab{border:1px solid transparent;color:var(--muted);background:transparent;border-radius:12px;min-height:63px;padding:9px 4px;display:grid;gap:2px;font-weight:700;font-size:.95rem}.step-tab .step-number{font-family:var(--mono);font-size:.7rem;font-weight:400}.step-tab[aria-selected="true"]{background:var(--blue);color:#fff}.step-tab:hover:not([aria-selected="true"]){background:var(--quiet)}.step-content{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:28px;padding:30px;align-items:center}.step-image{min-height:180px;padding:20px;display:grid;align-content:center;gap:12px;background:var(--bg);border-radius:16px}.demo-label{font-size:.76rem;color:var(--muted)}.demo-value{font-size:2.2rem;font-weight:800;letter-spacing:-.045em;line-height:1.2}.demo-unit{font-size:.9rem;font-weight:500;color:var(--muted)}.demo-divider{height:1px;background:var(--border)}.demo-note{font-size:.84rem;color:var(--muted)}.step-text{display:grid;gap:13px}.step-text h3{font-size:1.4rem}.step-text p{font-size:.97rem}.step-availability{font-size:.83rem!important;color:var(--muted);border-top:1px solid var(--border);padding-top:11px}.step-bottom{padding:0 30px 24px;font-size:.8rem;color:var(--muted)}.tech-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.tech{padding:22px;border-top:3px solid var(--charcoal);background:white;border-radius:0 0 14px 14px;display:grid;gap:9px;min-width:0}.tech .name{display:flex;align-items:center;justify-content:space-between;gap:10px}.tech .name span{font-size:.75rem;color:var(--muted)}.tech .why{font-size:.86rem;color:var(--muted)}.tech .example{font-size:.84rem;padding:10px 12px;background:var(--bg);border-radius:8px}.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.rule{display:grid;gap:8px}.rule svg{width:36px;height:36px;color:var(--blue)}.rule p{font-size:.88rem;color:var(--muted)}details{background:var(--paper);border:1px solid var(--border);border-radius:14px;margin:12px 0;min-width:0}summary{cursor:pointer;min-height:56px;padding:17px 20px;font-weight:650;list-style-position:inside}summary:hover{background:#f7f9fb;border-radius:14px}details[open] summary{border-bottom:1px solid var(--border);border-radius:14px 14px 0 0}.details-body{padding:21px;display:grid;gap:15px;font-size:.9rem;min-width:0}.details-body h3{font-size:1rem;margin-top:6px}.details-body p{color:var(--muted)}.details-body ul,.details-body ol{padding-left:1.4em;margin:0;display:grid;gap:7px}.details-body li{padding-left:3px}pre{font-family:var(--mono);font-size:.81rem;line-height:1.7;margin:0;padding:17px;background:#18202a;color:#e5edf5;border-radius:10px;overflow:auto;white-space:pre;max-width:100%;word-break:normal;tab-size:2}code{font-family:var(--mono);font-size:.9em;word-break:break-word}pre code{font-size:inherit;word-break:normal}.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:10px;max-width:100%}table{border-collapse:collapse;width:100%;font-size:.83rem}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}th{background:var(--bg);font-weight:700}tr:last-child td{border-bottom:0}.inline-note{padding:12px 14px;background:var(--bg);border-radius:9px;font-size:.84rem}.roadmap{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;counter-reset:road}.road-item{padding:16px 0;border-top:2px solid var(--border);display:grid;gap:9px;min-width:0}.road-item::before{counter-increment:road;content:"0" counter(road);font-family:var(--mono);font-size:.75rem;color:var(--blue)}.road-item p{font-size:.86rem;color:var(--muted)}.doc-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.doc-links a{display:inline-flex;align-items:center;min-height:44px;padding:9px 13px;background:white;border:1px solid var(--border);border-radius:8px;font-size:.85rem;text-decoration:none}.footer{border-top:1px solid var(--border);padding:28px 0 36px;display:grid;gap:10px;color:var(--muted);font-size:.82rem}.footer a{color:inherit}.footer p{max-width:90ch}.noscript{padding:18px;background:#fff5df;border:1px solid #e0c28b;border-radius:12px;margin-bottom:20px}.legend{font-size:.76rem;color:var(--muted)}.screen-reader-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:800px){.hero{grid-template-columns:minmax(0,1fr) 195px;gap:22px}.phone-art{width:190px}.status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.architecture{padding:20px}.core-flow{grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr);gap:4px}.arch-node{padding:20px 10px}.node-picture{width:58px;height:58px}.node-tech{font-size:.68rem}.roadmap{grid-template-columns:repeat(2,minmax(0,1fr))}.topbar-inner{flex-wrap:wrap;padding:14px 0;gap:5px}.nav{margin-left:-9px}.branch{grid-template-columns:1fr}}
+    @media(max-width:560px){.shell{width:calc(100% - 32px)}.hero{grid-template-columns:1fr;padding:34px 0 26px;gap:24px}.phone-art{width:180px}.hero-art{display:none}.hero-copy{gap:16px}.notice{padding:19px 18px;margin-bottom:36px}.section{padding-bottom:40px}.status-item{padding:15px 13px}.status-item strong{font-size:.94rem}.status-item p{font-size:.8rem}.section-head{margin-bottom:19px}.architecture{padding:18px}.core-flow{grid-template-columns:1fr;gap:12px}.arch-node{grid-template-columns:56px minmax(0,1fr);text-align:left;justify-items:start;padding:16px;gap:5px 14px}.arch-node .node-picture{grid-column:1;grid-row:1/5;align-self:center;width:52px;height:52px}.arch-node h3,.arch-node .node-sub,.arch-node .node-tech,.arch-node .node-badge{grid-column:2}.node-tech{font-size:.76rem}.node-badge{margin-top:3px}.flow-arrow{display:flex;justify-content:center;align-items:center;gap:12px;font-size:.77rem}.flow-arrow b{transform:rotate(90deg);font-size:1.5rem}.branch{gap:13px;margin-top:19px;padding-top:18px}.future-strip{padding:20px}.future-flow{grid-template-columns:1fr;gap:16px}.future-flow>.flow-arrow{justify-content:flex-start}.future-node{padding:0 0 0 4px}.future-node h3{font-size:1.12rem}.future-node p{font-size:.9rem}.step-tabs{gap:3px;padding:7px}.step-tab{font-size:.85rem;min-height:58px;border-radius:9px}.step-content{grid-template-columns:1fr;padding:20px;gap:23px}.step-image{min-height:160px}.step-bottom{padding:0 20px 20px}.tech-grid{grid-template-columns:1fr}.rules{grid-template-columns:1fr;gap:23px}.rule{grid-template-columns:38px minmax(0,1fr);gap:5px 13px}.rule svg{grid-row:1/3}.rule p{grid-column:2}.roadmap{gap:15px}.road-item h3{font-size:1rem}.details-body{padding:16px}.nav a{font-size:.79rem;padding:8px 9px}summary{padding:16px;font-size:.94rem}.doc-links{display:grid;grid-template-columns:1fr 1fr}.doc-links a{font-size:.8rem}.footer{padding-bottom:24px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+    @media print{body{background:white}.topbar,.nav,.skip,.hero-art{display:none}.shell{width:100%}.section{break-inside:avoid}.notice{background:#edf0f3;color:#171a20}.notice p{color:#536170}.status-grid{grid-template-columns:repeat(3,1fr)}a{color:inherit}.step-tab{border:1px solid #999}.step-tab[aria-selected=true]{color:#171a20;background:#eee}pre{white-space:pre-wrap;color:#171a20;background:#f1f1f1}details{break-inside:avoid}.footer{font-size:10pt}}
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="topbar"><div class="shell topbar-inner">
+  <a class="brand" href="#main"><span class="brandmark" aria-hidden="true">r</span>루틴로그 <span class="small muted">프로젝트 안내</span></a>
+  <nav class="nav" aria-label="안내서 목차"><a href="#status">현재 상태</a><a href="#architecture">전체 그림</a><a href="#flow">기록 흐름</a><a href="#start">직접 실행</a></nav>
+</div></header>
+<main id="main" class="shell">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">ROUTINLOG · 나만의 루틴 기록</p>
+      <h1 id="hero-title">기록은 간단하게.<br>나의 변화는 함께 보이게.</h1>
+      <p class="intro">한 번 정한 식사와 운동에서 달라진 것만 기록하고,<br>한 주의 계획과 실제를 나란히 살펴보는 앱입니다.</p>
+      <div class="tags"><span class="tag">Android 전용</span><span class="tag">Google 로그인 예정</span><span class="tag">온라인 기록</span></div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <svg class="phone-art" viewBox="0 0 244 304" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="21" y="3" width="202" height="298" rx="30" fill="#fff" stroke="#c6cfd9" stroke-width="2"/>
+        <rect x="91" y="15" width="62" height="6" rx="3" fill="#c6cfd9"/>
+        <text x="40" y="49" fill="#536170" font-size="11" font-family="sans-serif">나의 오늘</text><text x="40" y="74" fill="#171a20" font-size="19" font-weight="700" font-family="sans-serif">달라진 것만 기록해요</text>
+        <rect x="36" y="93" width="172" height="92" rx="16" fill="#242b35"/><text x="51" y="119" fill="#b8d99a" font-size="11" font-family="sans-serif">오늘의 운동</text><text x="51" y="149" fill="#fff" font-size="23" font-weight="700" font-family="sans-serif">하체 A</text><rect x="51" y="162" width="49" height="5" rx="2.5" fill="#b8d99a"/><rect x="105" y="162" width="49" height="5" rx="2.5" fill="#b8d99a"/><rect x="159" y="162" width="32" height="5" rx="2.5" fill="#596575"/>
+        <rect x="36" y="198" width="172" height="47" rx="12" fill="#edf0f3"/><text x="50" y="218" fill="#536170" font-size="10" font-family="sans-serif">체중 · 허리</text><text x="50" y="235" fill="#171a20" font-size="13" font-weight="700" font-family="sans-serif">83.2 kg · 80.0 cm</text>
+        <rect x="36" y="257" width="172" height="29" rx="9" fill="#2453bf"/><text x="122" y="276" text-anchor="middle" fill="#fff" font-size="11" font-family="sans-serif">예시 화면</text>
+      </svg>
+    </div>
+  </section>
+  <aside class="notice" aria-label="현재 개발 단계"><span class="dot" aria-hidden="true"></span><div><strong>지금은 앱과 서버의 기반을 만드는 단계입니다.</strong><p>샘플 화면과 일부 계산·보안 코드는 준비됐습니다. 실제 로그인, 개인 기록 저장, 주간 리포트·AI는 앞으로 연결합니다.</p></div></aside>
+
+  <section id="status" class="section" aria-labelledby="status-title">
+    <div class="section-head"><div class="section-title-row"><h2 id="status-title">어디까지 확인했나요?</h2><span class="small muted" data-status="updated-at">2026년 9월 30일 기준</span></div><p>‘코드가 있음’, ‘테스트 통과’, ‘휴대폰에서 확인’을 구분합니다.</p></div>
+    <!-- Update these data-status nodes only after checking the corresponding command output. -->
+    <div class="status-grid">
+      <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>서버 자동 테스트</div><strong data-status="server-tests">19개 통과</strong><p data-status="server-tests-detail">영양 계산 8 · 보안 7 · 스키마 4. H2 테스트 DB 기준입니다.</p></article>
+      <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>Android 앱 빌드</div><strong data-status="android-build">APK 생성 · 검사 통과</strong><p data-status="android-build-detail">Android 36 SDK 설치 완료. 입력 테스트 7개와 Lint가 통과했습니다. 실기기는 확인 전입니다.</p></article>
+      <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>Docker 엔진</div><strong data-status="docker-engine">실행 확인 · 29.6.2</strong><p data-status="docker-engine-detail">DB를 실행할 도구가 준비됐다는 뜻입니다.</p></article>
+      <article class="status-item"><div class="status-label"><span class="state-mark pass" aria-hidden="true"></span>실제 PostgreSQL</div><strong data-status="postgres">실제 DB 연결 확인</strong><p data-status="postgres-detail">PostgreSQL 17.11 · Flyway 적용 · 서버 UP · 비인가 요청 401을 확인했습니다.</p></article>
+      <article class="status-item"><div class="status-label"><span class="state-mark" aria-hidden="true"></span>원격 저장소</div><strong data-status="remote-push">첫 푸시 전</strong><p data-status="remote-push-detail">소스 반영과 앱의 스토어 배포는 별도 작업입니다.</p></article>
+      <article class="status-item"><div class="status-label"><span class="state-mark" aria-hidden="true"></span>GitHub 자동 검증</div><strong data-status="ci">절차 작성 · 실행 전</strong><p data-status="ci-detail">워크플로 파일이 있다는 것만으로 통과한 것은 아닙니다.</p></article>
+    </div>
+    <p class="status-foot">실제 휴대폰·Google 인증·건강 데이터 권한·배터리·TalkBack·운영 배포는 후속 검증입니다. <a href="VERIFICATION.md">자세한 검증 기록</a></p>
+  </section>
+
+  <section id="architecture" class="section" aria-labelledby="architecture-title">
+    <div class="section-head"><span class="section-index">전체 구조</span><h2 id="architecture-title">휴대폰은 입력하고,<br>서버는 확인하고, DB는 기억합니다.</h2><p>아래는 완성될 서비스의 구조입니다. 연결선이 보인다고 기능이 이미 연결된 것은 아닙니다.</p></div>
+    <figure>
+      <div class="architecture">
+        <div class="core-flow">
+          <div class="arch-node main">
+            <svg class="node-picture" viewBox="0 0 80 80" aria-hidden="true"><rect x="20" y="5" width="40" height="70" rx="9" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 14h16M34 66h12M29 29h22M29 40h14M29 51h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            <h3>Android 앱</h3><p class="node-sub">내가 보고 누르는 화면</p><span class="node-tech">Kotlin · Compose</span><span class="node-badge">샘플 화면 작성</span>
+          </div>
+          <div class="flow-arrow"><span>입력 / 결과</span><b aria-hidden="true">↔</b><span>HTTPS</span></div>
+          <div class="arch-node">
+            <svg class="node-picture" viewBox="0 0 80 80" aria-hidden="true"><rect x="11" y="13" width="58" height="23" rx="6" fill="none" stroke="currentColor" stroke-width="3"/><rect x="11" y="44" width="58" height="23" rx="6" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="23" cy="25" r="3" fill="currentColor"/><circle cx="23" cy="56" r="3" fill="currentColor"/><path d="M36 25h22M36 56h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            <h3>서버</h3><p class="node-sub">내 기록인지 확인하고 계산</p><span class="node-tech">Kotlin · Spring Boot</span><span class="node-badge">보안·계산 기반 작성</span>
+          </div>
+          <div class="flow-arrow"><span>저장 / 조회</span><b aria-hidden="true">↔</b><span>기록과 버전</span></div>
+          <div class="arch-node">
+            <svg class="node-picture" viewBox="0 0 80 80" aria-hidden="true"><ellipse cx="40" cy="18" rx="25" ry="10" fill="none" stroke="currentColor" stroke-width="3"/><path d="M15 18v42c0 6 11 11 25 11s25-5 25-11V18M15 39c0 6 11 11 25 11s25-5 25-11" fill="none" stroke="currentColor" stroke-width="3"/></svg>
+            <h3>기록 보관함</h3><p class="node-sub">계획과 실제 기록을 따로 보관</p><span class="node-tech">PostgreSQL</span><span class="node-badge">초기 스키마 작성</span>
+          </div>
+        </div>
+        <div class="branch">
+          <p class="branch-copy">사진은 기록 숫자와 보관 방식이 다릅니다.<br>서버가 소유자를 확인한 뒤 연결합니다.</p>
+          <div class="photo-node"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="32" rx="5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="18" r="4" fill="currentColor"/><path d="M7 35l10-10 8 7 7-11 10 14" fill="none" stroke="currentColor" stroke-width="2.5"/></svg><div><h3>비공개 사진 보관 <span class="small muted">· 예정</span></h3><p class="small">영양성분표·제품 사진. S3 등 객체 저장소를 검토합니다.</p></div></div>
+        </div>
+      </div>
+      <div class="future-strip">
+        <div class="future-label"><span>후속 구현</span>저장한 기록이 쌓이면 이어지는 흐름</div>
+        <div class="future-flow">
+          <div class="future-node"><span class="number">01 · 사실 정리</span><h3>주간 리포트</h3><p>코드가 당시 목표와 실제 기록을 집계합니다. 빠진 기록도 함께 표시합니다.</p></div>
+          <div class="flow-arrow"><b aria-hidden="true">→</b></div>
+          <div class="future-node"><span class="number">02 · 근거 연결</span><h3>AI 변경 초안</h3><p>요약 기록과 검토된 자료로 다음 선택지를 설명합니다. 계산을 지어내지 않습니다.</p></div>
+          <div class="flow-arrow"><b aria-hidden="true">→</b></div>
+          <div class="future-node"><span class="number">03 · 최종 결정</span><h3>사용자의 선택</h3><p>원하는 방향을 고르고 다시 기록합니다.</p><div class="choice-pills"><span class="apply">적용</span><span>수정</span><span>보류</span></div></div>
+        </div>
+        <p class="loop-note">적용을 확정하면 <strong>새 계획 버전</strong>이 생깁니다. 이전에 먹고 운동한 실제 기록은 그대로 남습니다.</p>
+      </div>
+      <figcaption>서버 안 기능들을 처음부터 여러 서버로 나누지 않습니다. 하나의 Spring Boot 프로그램 안에서 역할별로 정리합니다.</figcaption>
+    </figure>
+  </section>
+
+  <section id="flow" class="section" aria-labelledby="flow-title">
+    <div class="section-head"><span class="section-index">직접 눌러보기</span><h2 id="flow-title">기록 한 건은 이렇게 이동합니다.</h2><p>단계를 누르면 각 역할이 바뀝니다. 실제 개인 기록 저장이 완성된 후의 흐름을 설명하는 그림입니다.</p></div>
+    <noscript><p class="noscript">단계 전환은 JavaScript가 필요합니다. 첫 단계와 나머지 안내 내용은 그대로 읽을 수 있습니다.</p></noscript>
+    <div class="flow-demo">
+      <div class="step-tabs" role="tablist" aria-label="기록이 이동하는 단계">
+        <button class="step-tab" type="button" role="tab" id="tab-input" aria-controls="step-panel" aria-selected="true" tabindex="0" data-step="0"><span class="step-number">01</span>입력</button>
+        <button class="step-tab" type="button" role="tab" id="tab-check" aria-controls="step-panel" aria-selected="false" tabindex="-1" data-step="1"><span class="step-number">02</span>검증</button>
+        <button class="step-tab" type="button" role="tab" id="tab-save" aria-controls="step-panel" aria-selected="false" tabindex="-1" data-step="2"><span class="step-number">03</span>저장</button>
+        <button class="step-tab" type="button" role="tab" id="tab-report" aria-controls="step-panel" aria-selected="false" tabindex="-1" data-step="3"><span class="step-number">04</span>리포트</button>
+        <button class="step-tab" type="button" role="tab" id="tab-choice" aria-controls="step-panel" aria-selected="false" tabindex="-1" data-step="4"><span class="step-number">05</span>선택</button>
+      </div>
+      <div class="step-content" id="step-panel" role="tabpanel" aria-labelledby="tab-input" tabindex="0">
+        <div class="step-image" aria-hidden="true"><span class="demo-label" id="demo-label">오늘 체중 · 화면 예시</span><div class="demo-value"><span id="demo-value">83.2</span> <span class="demo-unit" id="demo-unit">kg</span></div><div class="demo-divider"></div><span class="demo-note" id="demo-note">평소 값에서 달라진 숫자만 바꿉니다.</span></div>
+        <div class="step-text" aria-live="polite" aria-atomic="true"><h3 id="step-title">휴대폰에서 달라진 값을 적습니다.</h3><p id="step-description">체중이나 허리둘레를 입력합니다. 측정하지 않은 항목은 비워둘 수 있습니다.</p><p class="step-availability" id="step-availability">현재: 샘플 입력 화면에서만 반영됩니다. 계정이나 서버에 저장되지 않습니다.</p></div>
+      </div>
+      <p class="step-bottom">키보드로는 탭 목록에서 ← →, Home, End 키를 사용할 수 있습니다. 이 그림은 서버로 요청을 보내지 않습니다.</p>
+    </div>
+  </section>
+
+  <section id="technology" class="section" aria-labelledby="tech-title">
+    <div class="section-head"><span class="section-index">기술을 고른 이유</span><h2 id="tech-title">이름보다, 하는 일을 먼저 보세요.</h2><p>앱과 서버는 같은 Kotlin을 쓰지만 서로 다른 프로그램입니다.</p></div>
+    <div class="tech-grid">
+      <article class="tech"><div class="name"><h3>Kotlin + Compose</h3><span>Android 화면</span></div><p>휴대폰의 화면과 버튼을 만드는 언어·도구입니다.</p><p class="why">선택 이유: Android 권한·키보드·접근성 기능과 연결하기 좋습니다.</p><p class="example">예: 체중을 수정하면 해당 화면의 숫자와 오류 안내가 함께 바뀝니다.</p></article>
+      <article class="tech"><div class="name"><h3>Spring Boot</h3><span>서버</span></div><p>요청을 받고 검증·계산·저장을 처리하는 기반입니다.</p><p class="why">선택 이유: 인증·DB 처리·운영 상태 확인을 한 프로그램에서 시작합니다.</p><p class="example">예: 사용자 A의 요청으로 사용자 B의 기록을 읽지 못하게 합니다.</p></article>
+      <article class="tech"><div class="name"><h3>PostgreSQL + Flyway</h3><span>데이터·변경 이력</span></div><p>관계가 있는 기록을 보관하고, 보관 구조의 변경을 관리합니다.</p><p class="why">선택 이유: 날짜별 기록·계획 버전·중복 금지를 일관되게 다룹니다.</p><p class="example">예: 같은 날짜의 체중을 두 번 저장해도 두 건으로 쌓이지 않게 설계합니다.</p></article>
+      <article class="tech"><div class="name"><h3>Docker + GitHub Actions</h3><span>개발·자동 검증</span></div><p>같은 DB 실행 환경을 만들고, 코드를 바꿀 때 검사를 반복합니다.</p><p class="why">선택 이유: 내 PC에서만 되는 문제를 줄이고 실패를 빨리 확인합니다.</p><p class="example">예: 코드 반영 후 서버 테스트와 Android 빌드를 자동 실행합니다.</p></article>
+    </div>
+    <details><summary>ViewModel·API·SDK·APK도 무엇인지 알고 싶다면</summary><div class="details-body">
+      <div class="table-wrap"><table><thead><tr><th scope="col">이름</th><th scope="col">쉽게 말하면</th><th scope="col">루틴로그에서</th></tr></thead><tbody>
+        <tr><th scope="row">ViewModel · StateFlow</th><td>화면의 입력·로딩·오류 상태를 관리하고 변화시킵니다.</td><td>회전해도 입력을 유지하고, 저장 중에는 중복 버튼 입력을 막습니다.</td></tr>
+        <tr><th scope="row">API · Retrofit · OkHttp</th><td>앱과 서버가 주고받는 약속, 그 통신을 돕는 도구입니다.</td><td>현재는 개발 화면에서 서버 상태를 조회합니다.</td></tr>
+        <tr><th scope="row">Coroutines</th><td>통신을 기다리는 동안 화면이 멈추지 않게 일을 나눕니다.</td><td>요청 중 표시와 실패 안내를 화면 상태로 전달합니다.</td></tr>
+        <tr><th scope="row">SDK · Gradle</th><td>Android 제작 도구 모음과 빌드 실행 도구입니다.</td><td>소스 코드를 휴대폰에서 실행할 형태로 만듭니다.</td></tr>
+        <tr><th scope="row">APK · AAB</th><td>APK는 설치 파일, AAB는 스토어 제출에 쓰는 배포 묶음입니다.</td><td>Debug APK 검증 후, 기능·서명·스토어 준비를 갖춰 Release를 만듭니다.</td></tr>
+        <tr><th scope="row">Health Connect</th><td>기기의 건강 데이터를 권한에 따라 읽는 연결 지점입니다.</td><td>지원 환경을 확인해 누적 걸음을 읽는 기능을 추가할 예정입니다.</td></tr>
+        <tr><th scope="row">OCR · 객체 저장소</th><td>사진 속 글자를 추출하는 기능과 사진 파일 보관함입니다.</td><td>영양표를 읽고 사용자 확인을 거쳐 식품으로 등록할 예정입니다.</td></tr>
+      </tbody></table></div>
+    </div></details>
+  </section>
+
+  <section class="section" aria-labelledby="rules-title">
+    <div class="section-head"><h2 id="rules-title">기록의 의미가 바뀌지 않도록.</h2></div>
+    <div class="rules">
+      <article class="rule"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="6" width="23" height="28" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 14h10M12 21h6M24 27l4 4 8-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><h3>계획 ≠ 실제 기록</h3><p>다음 주 계획을 수정해도, 지난주 실제로 먹고 운동한 기록은 유지합니다.</p></article>
+      <article class="rule"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M14 20h12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><h3>정보 없음 ≠ 0</h3><p>단백질 값이 없으면 미확인입니다. 먹지 않았거나 0g인 기록과 구분합니다.</p></article>
+      <article class="rule"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 10h24v15H18l-7 7v-7H8z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M15 18l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg><h3>AI 제안 ≠ 자동 적용</h3><p>최종 결정은 사용자에게 있습니다. 부족 칼로리를 다음 주에 몰아서 채우지 않습니다.</p></article>
+    </div>
+    <details><summary>계산·개인정보·기록 보존의 세부 기준</summary><div class="details-body">
+      <ul><li>영양 계산은 원본 기준량과 실제 섭취 g의 비율을 코드로 계산합니다. 예: 80g당 160kcal → 120g 섭취 시 240kcal. 원본과 계산 버전을 보존합니다.</li><li>제품 정보나 기본 계획을 수정해도 과거 실제 기록의 스냅샷을 조용히 바꾸지 않습니다. 누락된 기록과 영양정보가 없는 기록도 구분합니다.</li><li>걸음 누적값은 다시 읽을 때 덧셈하지 않으며, 휴대폰과 워치의 중복을 처리합니다. 소비 열량을 식사 목표에 자동 가산하지 않습니다.</li><li>온라인 전용입니다. 서버 응답을 받지 못하면 저장 완료라고 표시하지 않고, 같은 저장 요청을 다시 보내도 중복 기록이 생기지 않게 구현합니다.</li><li>로그에 인증 토큰·신체값·식단·자유 메모를 통째로 남기지 않습니다. 계정 삭제는 접근 차단과 원본·사진·리포트·추천 삭제까지 포함하는 후속 기능입니다.</li><li>체중 변화는 기록에서 보인 관계로 설명합니다. 특정 식사·운동이 원인이라고 단정하거나 의료 진단으로 표현하지 않습니다.</li></ul>
+      <p>시안의 초기 영양 목표·운동 정책은 과학적 검토를 마친 출시 정책이 아닙니다. Google·건강 데이터·AI·OCR·사진 보관의 실제 권한과 개인정보 조건은 기능 연결 때 확정합니다.</p>
+    </div></details>
+  </section>
+
+  <section id="start" class="section" aria-labelledby="start-title">
+    <div class="section-head"><span class="section-index">실행 안내</span><h2 id="start-title">화면 보기와 코드 실행은 다릅니다.</h2><p>화면만 보려면 디자인 시안을 열고, 실제 앱 빌드는 Android 도구를 사용합니다.</p></div>
+    <div class="doc-links" style="margin:0 0 20px"><a href="../design-reference/index.html">67개 화면 시안 열기 ↗</a><a href="ARCHITECTURE.md">전체 아키텍처 보기</a></div>
+
+    <details><summary>먼저 준비할 도구와 저장소 위치</summary><div class="details-body">
+      <p>Windows PowerShell 기준입니다. 서버는 JDK 21, Android는 JDK 17 이상(현재 환경 21), DB는 실행 중인 Docker Desktop이 필요합니다. Gradle은 저장소의 Wrapper가 준비합니다.</p>
+      <pre><code>RoutinLog/
+├─ android/             휴대폰 앱 · 독립 Gradle 프로젝트
+├─ server/              서버 · 독립 Gradle 프로젝트
+├─ docs/                이 안내서와 설계·검증 기록
+├─ design-reference/    기존 67개 화면 시안과 자산 라이선스
+├─ .github/workflows/   자동 빌드·테스트 절차
+├─ compose.yaml         로컬 PostgreSQL 실행 설정
+└─ .env.example         개인 DB 설정을 만들기 위한 예시</code></pre>
+      <p>앱과 서버를 나눴기 때문에 Android SDK가 없어도 서버를 개발·테스트할 수 있습니다. 아래 명령은 별도 표시가 없으면 저장소 루트에서 실행합니다.</p>
+    </div></details>
+
+    <details><summary>1. PostgreSQL과 서버 실행하기</summary><div class="details-body">
+      <p>처음 한 번 <code>.env.example</code>을 복사하고 <code>POSTGRES_PASSWORD</code>를 본인 로컬 비밀번호로 바꿉니다. 이미 <code>.env</code>가 있으면 복사하지 않습니다.</p>
+      <pre><code>Copy-Item .env.example .env
+# .env의 POSTGRES_PASSWORD를 변경한 뒤 실행
+docker compose up -d postgres
+
+$env:DB_URL = 'jdbc:postgresql://127.0.0.1:5432/routinlog'
+$env:DB_USERNAME = 'routinlog'
+$env:DB_PASSWORD = 'YOUR_LOCAL_DB_PASSWORD'
+.\server\gradlew.bat -p server bootRun</code></pre>
+      <p><code>YOUR_LOCAL_DB_PASSWORD</code>는 예시 자리입니다. <code>.env</code>에 지정한 비밀번호와 같게 바꿉니다. DB 이름·사용자를 바꿨다면 URL과 사용자도 맞춥니다.</p>
+      <p>Docker Compose는 <code>.env</code>를 읽고, Spring Boot에는 <code>DB_*</code> 환경변수를 따로 전달합니다. 비밀번호가 포함된 <code>.env</code>는 Git에 올리지 않습니다. 개발 서버·DB는 기본적으로 PC 내부에만 열립니다.</p>
+      <h3>다른 터미널에서 상태 확인</h3>
+      <pre><code>Invoke-RestMethod http://127.0.0.1:8080/actuator/health
+Invoke-RestMethod http://127.0.0.1:8080/api/v1/system/status</code></pre>
+      <p>정상 상태는 health의 <code>UP</code>와 아래 형태의 응답입니다. 버전은 실제 빌드값이며, <code>ready</code>가 앱 출시 준비나 로그인 성공을 뜻하지는 않습니다. 그 외 개인 API는 인증 구현 전까지 기본 차단합니다.</p>
+      <pre><code>{"service":"routinlog","status":"ready","version":"0.0.1-SNAPSHOT"}</code></pre>
+      <p>종료는 서버 터미널에서 <code>Ctrl+C</code>, DB는 <code>docker compose stop</code>입니다. 일반 종료에 DB 볼륨 삭제 명령을 사용하지 않습니다.</p>
+    </div></details>
+
+    <details><summary>2. Android 앱 빌드하고 서버 연결 확인하기</summary><div class="details-body">
+      <p>Android Studio에서 <code>android/</code>를 열고 SDK Platform 36과 Build Tools 36.0.0을 준비합니다. 개인 SDK 경로는 <code>android/local.properties</code> 또는 <code>ANDROID_HOME</code>에 두며 저장소에 올리지 않습니다.</p>
+      <pre><code>.\android\gradlew.bat -p android :app:assembleDebug :app:testDebugUnitTest :app:lintDebug</code></pre>
+      <p>APK는 <code>android/app/build/outputs/apk/debug/</code>에서 확인합니다. 에뮬레이터의 기본 서버 주소는 PC를 가리키는 <code>http://10.0.2.2:8080/</code>입니다.</p>
+      <p>서버를 실행한 상태에서 시작 화면의 <strong>개발 연결 확인</strong>을 누르면 실제 상태 요청을 보냅니다. 샘플 체험의 체중·허리는 이 요청에 포함하지 않습니다.</p>
+      <h3>USB로 연결한 실제 기기에서 개발 서버를 쓸 때</h3>
+      <pre><code>adb reverse tcp:8080 tcp:8080
+.\android\gradlew.bat -p android :app:installDebug -Proutinlog.debugApiBaseUrl=http://localhost:8080/</code></pre>
+      <p>기기를 개발용으로 연결·승인한 뒤 실행합니다. HTTP 예외는 Debug의 에뮬레이터·localhost에만 허용하며, 다른 개발 주소는 HTTPS를 사용합니다.</p>
+      <div class="inline-note">현재 앱의 샘플은 메모리에만 있습니다. 화면 회전 중에는 입력을 유지하지만 체험 종료·프로세스 종료 시 초기화됩니다. 실제 로그인·저장·식단·운동 편집·건강 연동은 아직 제공하지 않습니다.</div>
+    </div></details>
+
+    <details><summary>3. 테스트 결과를 확인하고 한계를 구분하기</summary><div class="details-body">
+      <pre><code>.\server\gradlew.bat -p server test bootJar
+.\android\gradlew.bat -p android :app:testDebugUnitTest :app:lintDebug</code></pre>
+      <p>서버 실행 JAR는 <code>server/build/libs/</code>, 서버 테스트 보고서는 <code>server/build/reports/tests/test/index.html</code>에 생성됩니다.</p>
+      <ul><li>서버 19개 테스트는 영양 비례 계산·null·범위, 보안 접근 차단, Flyway 스키마·JPA 매핑과 제약을 확인합니다.</li><li>서버의 로컬 자동 테스트 DB는 H2의 PostgreSQL 호환 모드입니다. 실제 PostgreSQL에서의 기동·마이그레이션 검증은 별도입니다.</li><li>Android 입력 테스트 7개는 null, 빈 입력, 잘못된 숫자·정밀도, 소수점 쉼표·날짜, 상한 포함과 초과를 확인합니다.</li><li>체중 1,000kg·허리 500cm의 상한은 서버 저장 범위와 맞춘 기술적 제한이며 의학적 권고가 아닙니다.</li><li>자동 검사 통과와 실제 기기 사용성 검증은 다릅니다. TalkBack·큰 글씨·키보드·뒤로가기·통신 실패·백그라운드 복귀·배터리를 따로 확인합니다.</li></ul>
+      <p>최신 성공·실패·미확인 상태는 이 페이지 상단과 <a href="VERIFICATION.md">검증 기록</a>을 봅니다. CI 파일 작성과 원격 CI 실행 통과도 구분합니다.</p>
+    </div></details>
+
+    <details><summary>4. 운영 앱·스토어 배포 전 필요한 설정</summary><div class="details-body">
+      <ul><li>임시 앱 식별자는 <code>com.bapegg.routinlog</code>입니다. Google Play 최초 등록과 OAuth 클라이언트 생성 전에 소유자가 확정합니다.</li><li>Release에는 가짜 운영 주소가 없습니다. <code>routinlog.apiBaseUrl</code> 또는 <code>ROUTINLOG_API_BASE_URL</code>로 실제 HTTPS 기본 주소를 설정해야 사전 빌드 검사를 통과합니다.</li><li>기본 주소는 끝 <code>/</code>가 필요하며 사용자정보·쿼리·fragment를 넣지 않습니다. Release는 HTTP를 허용하지 않습니다.</li><li>실제 Google 설정, 서명키, 운영 API와 개인정보·삭제·지원 안내, 스토어 테스트·심사가 별도로 필요합니다. API 키·서명키·토큰을 소스에 넣지 않습니다.</li><li>클라우드·AI·OCR 제공자와 비용·계약 조건은 연결 단계에 확정합니다. 구조도에 있는 S3·AI가 현재 배포되었다는 뜻은 아닙니다.</li></ul>
+      <p>빌드나 첫 Git 푸시가 성공해도 아직 샘플 체험 단계라면 출시 완성본이 아닙니다. 미완성 기능을 실제 서비스 기능으로 소개하지 않습니다.</p>
+    </div></details>
+
+    <details><summary>고정 버전과 의존성 기준</summary><div class="details-body">
+      <div class="table-wrap"><table><thead><tr><th scope="col">영역</th><th scope="col">현재 기준</th></tr></thead><tbody>
+        <tr><th scope="row">서버</th><td>JDK 21 · Spring Boot 4.0.8 · Kotlin 2.2.21</td></tr>
+        <tr><th scope="row">Android 빌드</th><td>Gradle 9.3.1 · AGP 9.1.1 · 내장 Kotlin/Compose compiler 2.2.10</td></tr>
+        <tr><th scope="row">Android 실행·SDK</th><td>JDK 17 이상(현재 21, Java 타깃 17) · compile/target 36 · min 26 · Build Tools 36.0.0</td></tr>
+        <tr><th scope="row">화면·상태</th><td>Compose BOM 2025.08.00 · Activity 1.11.0 · Lifecycle 2.9.4</td></tr>
+        <tr><th scope="row">앱 통신</th><td>Coroutines 1.10.2 · Retrofit 3.0.0 · OkHttp 4.12.0</td></tr>
+        <tr><th scope="row">DB 실행</th><td>PostgreSQL 17.11-alpine · Flyway 변경 이력</td></tr>
+      </tbody></table></div>
+      <p>Android AGP 9는 Kotlin을 내장하므로 <code>org.jetbrains.kotlin.android</code> 플러그인을 중복 적용하지 않습니다. 앱과 서버는 독립 Gradle 프로젝트이며 Wrapper 배포본 체크섬을 고정합니다.</p>
+      <p>근거: <a href="https://developer.android.com/build/releases/agp-9-1-0-release-notes" target="_blank" rel="noopener noreferrer">AGP 호환 표</a> · <a href="https://developer.android.com/build/migrate-to-built-in-kotlin" target="_blank" rel="noopener noreferrer">내장 Kotlin</a> · <a href="https://developer.android.com/develop/ui/compose/bom" target="_blank" rel="noopener noreferrer">Compose 버전 관리</a> · <a href="https://developer.android.com/jetpack/androidx/releases/activity" target="_blank" rel="noopener noreferrer">Activity</a> · <a href="https://developer.android.com/jetpack/androidx/releases/lifecycle" target="_blank" rel="noopener noreferrer">Lifecycle</a></p>
+    </div></details>
+
+    <details><summary>디자인 시안·폰트·이미지의 사용 범위</summary><div class="details-body">
+      <p><a href="../design-reference/index.html">디자인 기준 시안</a>은 2026년 9월 30일 보존한 67개 HTML 화면입니다. 같은 폴더의 assets와 함께 열며 실제 Android 앱이나 서버 연동 화면은 아닙니다.</p>
+      <ul><li>실버 배경·차콜 카드·짙은 블루 실행 버튼·은은한 연두 선택/완료·빨강 오류를 앱에 옮깁니다.</li><li>과거 시안의 Naver·iOS 설명은 현재 구현 범위가 아닙니다. 현재 기준은 Android·Google·온라인 기록입니다.</li><li>가상 날짜·수치를 실제 기록으로 초기화하지 않습니다. 제품 사진·검수 운동 영상·3D 모델도 시안으로 확보된 것이 아닙니다.</li><li>Android 폰트는 현재 시스템 sans-serif입니다. 웹용 SUIT woff2를 Android 폰트로 사용하지 않으며, 추후 TTF/OTF와 라이선스를 확인합니다.</li><li>웹 시안 자산의 <a href="../design-reference/assets/SUIT-LICENSE.txt">SUIT 라이선스</a>와 <a href="../design-reference/assets/LUCIDE-LICENSE.txt">Lucide 라이선스</a>를 함께 보존합니다.</li></ul>
+      <p>이 안내서는 외부 폰트·CDN·이미지를 불러오지 않으며 시스템 글꼴과 자체 SVG를 사용합니다. 인터넷이 없어도 파일을 브라우저에서 열어 읽을 수 있습니다.</p>
+    </div></details>
+  </section>
+
+  <section class="section" aria-labelledby="next-title">
+    <div class="section-head"><h2 id="next-title">다음은 ‘실제로 남는 기록’부터.</h2><p>한 기능을 입력 → 서버 → DB → 다시 보기까지 연결한 뒤 넓혀갑니다.</p></div>
+    <div class="roadmap"><article class="road-item"><h3>내 계정 연결</h3><p>Google 인증과 사용자별 접근을 완성합니다.</p></article><article class="road-item"><h3>하루 기록 저장</h3><p>체중·허리·컨디션 한 건을 끝까지 연결합니다.</p></article><article class="road-item"><h3>식사·운동 기록</h3><p>기본값에서 달라진 양·세트만 고칩니다.</p></article><article class="road-item"><h3>한 주를 함께 보기</h3><p>실제 리포트부터 검증하고, 근거 기반 제안을 붙입니다.</p></article></div>
+    <div class="doc-links"><a href="DOMAIN-MODEL.md">데이터 설계</a><a href="DELIVERY-PLAN.md">단계별 완료 기준</a><a href="DECISIONS.md">기술 선택 기록</a><a href="VERIFICATION.md">검증 기록</a></div>
+  </section>
+</main>
+<footer class="shell footer">
+  <p><strong>이 파일을 브라우저에서 열어보세요.</strong> GitHub의 파일 화면은 HTML을 앱처럼 자동 실행하지 않습니다. 내려받은 저장소에서 <code>docs/index.html</code>을 열면 됩니다.</p>
+  <p>설명 방식은 <a href="https://github.com/anthropics/claude-plugins-community/blob/main/eli5/skills/eli5/SKILL.md" target="_blank" rel="noopener noreferrer">ELI5 스킬 원문</a>의 큰 그림·적은 글 원칙을 참고했습니다. 커뮤니티 제공 스킬이며 이 환경에 설치했다는 뜻은 아닙니다.</p>
+  <p>루틴로그 프로젝트 안내 · 설명 그림은 목표 구조, 실제 구현·검증 상태는 위 상태표 기준입니다.</p>
+</footer>
+<script>
+(() => {
+  const steps = [
+    { label:'오늘 체중 · 화면 예시', value:'83.2', unit:'kg', note:'평소 값에서 달라진 숫자만 바꿉니다.', title:'휴대폰에서 달라진 값을 적습니다.', description:'체중이나 허리둘레를 입력합니다. 측정하지 않은 항목은 비워둘 수 있습니다.', availability:'현재: 샘플 입력 화면에서만 반영됩니다. 계정이나 서버에 저장되지 않습니다.' },
+    { label:'서버에서 확인할 것', value:'내 기록인가?', unit:'', note:'로그인 · 단위 · 값의 범위 · 요청 중복을 확인합니다.', title:'서버가 소유자와 입력을 확인합니다.', description:'남의 기록에 접근하지 못하게 하고, 숫자와 단위가 유효한지 확인합니다. 재시도도 같은 요청으로 구분합니다.', availability:'현재: 개인 API 기본 차단과 일부 계산·제약 테스트가 있습니다. 실제 로그인·저장 검증 연결은 예정입니다.' },
+    { label:'따로 남기는 두 가지', value:'계획 / 실제', unit:'', note:'그날 목표와 실제 측정·섭취·수행 값을 함께 보존합니다.', title:'당시 계획과 실제 기록을 따로 저장합니다.', description:'계획을 나중에 바꿔도 지난 기록을 덮어쓰지 않습니다. 서버가 저장 결과를 돌려줘야 완료로 표시합니다.', availability:'현재: 사용자·Google 식별자·신체 기록의 초기 DB 구조만 있습니다. 개인 기록 저장 API는 예정입니다.' },
+    { label:'지난주 비교의 예시', value:'목표 ↔ 실제', unit:'', note:'빠진 기록은 0으로 채우지 않습니다.', title:'한 주의 숫자와 기록 범위를 묶습니다.', description:'그날 적용된 목표와 실제 영양·몸·운동·걸음을 비교합니다. 자료가 적으면 판단할 수 있는 범위도 함께 표시합니다.', availability:'현재: 실제 주간 집계는 아직 없습니다. HTML 시안의 리포트 숫자는 가상 예시입니다.' },
+    { label:'마지막 결정권자', value:'사용자', unit:'', note:'적용 · 직접 수정 · 보류 중 선택합니다.', title:'제안을 고르면 새 계획으로 이어집니다.', description:'AI는 검토된 근거와 내 기록으로 변경 초안을 설명합니다. 내가 확정한 내용만 다음 계획에 반영합니다.', availability:'현재: AI 연결·제안 검증·결정 이력 저장은 후속 구현입니다. 지난주 칼로리 차이를 다음 주에 몰아 보상하지 않습니다.' }
+  ];
+  const tabs = [...document.querySelectorAll('[data-step]')];
+  const panel = document.getElementById('step-panel');
+  const fields = {'demo-label':'label','demo-value':'value','demo-unit':'unit','demo-note':'note','step-title':'title','step-description':'description','step-availability':'availability'};
+  function choose(index, focus = false) {
+    const item = steps[index];
+    tabs.forEach((tab,i) => { tab.setAttribute('aria-selected',String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
+    panel.setAttribute('aria-labelledby', tabs[index].id);
+    Object.entries(fields).forEach(([id,key]) => { document.getElementById(id).textContent = item[key]; });
+    if (focus) tabs[index].focus();
+  }
+  tabs.forEach((tab,index) => {
+    tab.addEventListener('click', () => choose(index));
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = tabs.length - 1;
+      else return;
+      event.preventDefault(); choose(next, true);
+    });
+  });
+})();
+</script>
+</body>
+</html>

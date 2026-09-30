@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: routinlog
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/routinlog}
+    username: ${DB_USERNAME:routinlog}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 5000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    validate-on-migrate: true
+    clean-disabled: true
+    baseline-on-migrate: false
+  mvc:
+    log-request-details: false
+
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${PORT:8080}
+  forward-headers-strategy: none
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+    jmx:
+      exposure:
+        exclude: "*"
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN

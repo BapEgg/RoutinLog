@@ -1,0 +1,95 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'design-reference/**'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'design-reference/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.11-alpine
+        env:
+          POSTGRES_DB: routinlog
+          POSTGRES_USER: routinlog
+          POSTGRES_PASSWORD: local-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U routinlog -d routinlog"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+      - name: Test and package server
+        working-directory: server
+        run: bash ./gradlew test bootJar --no-daemon
+      - name: Verify PostgreSQL migration and HTTP startup
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/routinlog
+          DB_USERNAME: routinlog
+          DB_PASSWORD: local-ci-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -jar server/build/libs/*-SNAPSHOT.jar > "$RUNNER_TEMP/routinlog-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health > "$RUNNER_TEMP/health.json"; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/routinlog-server.log"
+            exit 1
+          fi
+          python -c 'import json, os; assert json.load(open(os.environ["RUNNER_TEMP"] + "/health.json"))["status"] == "UP"'
+          curl --fail --silent http://127.0.0.1:8080/api/v1/system/status
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/api/v1/body-records)
+          test "$code" = 401 -o "$code" = 403
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+      - name: Build, test, and lint Android
+        working-directory: android
+        run: bash ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon

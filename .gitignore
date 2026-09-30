@@ -1,0 +1,26 @@
+# Credentials, machine configuration, and generated output
+.env
+.env.*
+!.env.example
+**/local.properties
+**/*.jks
+**/*.keystore
+**/google-services.json
+**/credentials*.json
+**/service-account*.json
+*.pem
+*.key
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+**/.gradle/
+**/.kotlin/
+**/build/
+.tools/
+.gradle-cache/
+*.log
+captures/
+
+# Wrapper JARs are source-controlled bootstrap tools, not build output.
+!**/gradle/wrapper/gradle-wrapper.jar
