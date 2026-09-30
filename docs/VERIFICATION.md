@@ -13,6 +13,7 @@
 | 실제 앱 화면 캡처 | 67개 화면 캡처 완료, HTML 디자인 시안과 별도의 Android 갤러리로 제공 |
 | 화면 배치 확인 | 320dp 화면과 약 393dp·글자 130%에서 홈·컨디션·식품량·프로그램·세트 기록·리포트·설정 확인. 큰 글씨의 리포트 버튼 줄바꿈 수정 |
 | HTML 갤러리 | 320·390·768·1440px에서 이미지 67개 로드, 분류, 확대, 키보드 탐색 통과. JS 오류·가로 넘침 없음 |
+| 원격 CI | 코드 8e084ba · [실행 36686771964](https://github.com/BapEgg/RoutinLog/actions/runs/36686771964) 서버·Android 모두 통과. UI 테스트 APK는 CI에서 빌드하고, 5개 UI 테스트 실행은 로컬 에뮬레이터에서 확인 |
 | 실제 값 변화 | 음식 양·구성 합계, 부분 영양합계/null, 끼니 편집, 세트 입력·타이머, 날짜별 컨디션·측정, 설정 단위 변환을 메모리 상태로 연결 |
 
 실행 명령: `android/gradlew -p android :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:lintDebug --no-daemon`.
