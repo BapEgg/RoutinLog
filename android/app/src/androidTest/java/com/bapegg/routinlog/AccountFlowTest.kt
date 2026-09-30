@@ -10,8 +10,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bapegg.routinlog.data.*
+import com.bapegg.routinlog.domain.NutritionMath
 import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
+import com.bapegg.routinlog.ui.MealViewModel
 import com.bapegg.routinlog.ui.PreviewSession
 import com.bapegg.routinlog.ui.RoutineLogApp
 import com.bapegg.routinlog.ui.RoutineLogViewModel
@@ -24,6 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 import java.io.FileOutputStream
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -33,22 +36,26 @@ class AccountFlowTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private lateinit var account: AccountViewModel
     private lateinit var source: FakeAccountDataSource
+    private var meals: MealViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource()) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
             val factory = viewModelFactory {
                 initializer { AccountViewModel(source) }
                 initializer { RoutineLogViewModel(SystemStatusRepository.create("", debug = true)) }
+                initializer { MealViewModel(requireNotNull(mealFake)) }
             }
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
+            meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
+        if (mealFake != null) compose.waitUntil(5_000) { meals?.state?.value?.let { it.loaded && !it.loading } == true }
         compose.waitForIdle()
         compose.runOnIdle {
             assertEquals("H01", session().route)
@@ -319,6 +326,72 @@ class AccountFlowTest {
         }
     }
 
+    @Test fun sessionExpiredByAnotherFeatureClearsAccountWithoutRefresh() {
+        start()
+        compose.runOnIdle { source.expireFromAnotherFeature() }
+        compose.waitForIdle()
+        compose.onNodeWithText("로그인 없이 둘러보기").assertExists()
+        compose.runOnIdle {
+            assertNull(account.state.value.userId)
+            assertTrue(account.state.value.records.isEmpty())
+            assertFalse(session().accountMode)
+            assertTrue(session().values.isEmpty())
+        }
+    }
+
+    @Test fun realAppMealTabRegistersFoodAndClearsMealStateWhenAccountExpires() {
+        val mealSource = WrapperMealDataSource()
+        start(mealFake = mealSource)
+        val mealModel = requireNotNull(meals)
+        // Use the real RoutineLogApp tab and router, not a directly mounted food screen.
+        compose.onNodeWithText("식단", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("기록한 섭취량").assertExists()
+        capture("qa-live-food-app.png")
+        compose.onNodeWithText("첫 음식 등록").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("음식 이름").performScrollTo().performTextReplacement("통합 흐름 테스트 식품")
+        compose.onNodeWithContentDescription("기준량").performScrollTo().performTextReplacement("80")
+        compose.onNodeWithContentDescription("열량").performScrollTo().performTextReplacement("160")
+        compose.onNodeWithText("내 음식에 저장").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onAllNodesWithText("먹은 음식 기록").onFirst().performScrollTo().performClick()
+        compose.onNodeWithText("음식 선택하기").performScrollTo().performClick()
+        compose.onNodeWithText("통합 흐름 테스트 식품").assertExists()
+        compose.onNodeWithText("이 음식 추가").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals("F03", session().route)
+            assertTrue(session().accountMode)
+            assertFalse(session().previewMode)
+            assertEquals(TEST_USER_ID, mealModel.state.value.userId)
+            assertEquals(1, mealModel.state.value.foods.size)
+            assertNotNull(mealModel.state.value.plan)
+            assertNotNull(mealModel.state.value.day)
+            assertEquals(source.today, mealModel.state.value.day?.date)
+            assertEquals(1, mealModel.state.value.draft?.items?.size)
+            source.expireFromAnotherFeature()
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("로그인 없이 둘러보기").assertExists()
+        compose.onNodeWithText("통합 흐름 테스트 식품").assertDoesNotExist()
+        compose.runOnIdle {
+            assertNull(account.state.value.userId)
+            assertEquals("A01", session().route)
+            assertFalse(session().accountMode)
+            assertTrue(session().values.isEmpty())
+            val cleared = mealModel.state.value
+            assertNull(cleared.userId)
+            assertTrue(cleared.foods.isEmpty())
+            assertTrue(cleared.templates.isEmpty())
+            assertNull(cleared.plan)
+            assertNull(cleared.day)
+            assertNull(cleared.draft)
+            assertFalse(cleared.loaded)
+            assertFalse(cleared.loading)
+            assertFalse(cleared.busy)
+            // Expiring a session clears the client; it must not delete persisted food data.
+            assertEquals(1, mealSource.foods.size)
+        }
+    }
+
     private fun assertAccountStillLoaded() {
         assertEquals(TEST_USER_ID, account.state.value.userId)
         assertEquals(TEST_USER_ID, source.identity.value?.userId)
@@ -414,12 +487,38 @@ class AccountFlowTest {
             identityState.value = null
         }
 
+        fun expireFromAnotherFeature() { identityState.value = null }
+
         private fun failIfRequested(failure: AccountException?) {
             if (failure != null) {
                 if (failure.kind == AccountErrorKind.EXPIRED) identityState.value = null
                 throw failure
             }
         }
+    }
+
+    /** Only methods exercised by this wrapper test are implemented; no real account or HTTP. */
+    private class WrapperMealDataSource : MealDataSource {
+        val foods = mutableListOf<FoodDto>()
+        private val plan = MealPlanDto(listOf(
+            MealSlot("00000000-0000-0000-0000-000000000001", "아침"),
+            MealSlot("00000000-0000-0000-0000-000000000002", "점심"),
+            MealSlot("00000000-0000-0000-0000-000000000003", "저녁"),
+        ))
+        override suspend fun listFoods() = foods.toList()
+        override suspend fun listMealTemplates() = emptyList<MealTemplateDto>()
+        override suspend fun getMealPlan() = plan
+        override suspend fun getMealDay(date: String) = MealDayDto(date, emptyList(), NutritionMath.totals(emptyList()), NutritionValues(kcal = BigDecimal("2300")))
+        override suspend fun saveFood(id: String, food: FoodWrite): FoodDto {
+            check(food.version == null && foods.none { it.id == id })
+            return FoodDto(id, food.name, food.brand, food.basisGrams, food.nutrition, food.preparation, food.sourceNote, version = 1).also { foods += it }
+        }
+        override suspend fun deleteFood(id: String, version: Long) = error("Not exercised")
+        override suspend fun saveMealTemplate(id: String, template: MealTemplateWrite): MealTemplateDto = error("Not exercised")
+        override suspend fun deleteMealTemplate(id: String, version: Long) = error("Not exercised")
+        override suspend fun saveMealPlan(plan: MealPlanWrite): MealPlanDto = error("Not exercised")
+        override suspend fun saveMeal(id: String, meal: MealWrite): MealDto = error("Not exercised")
+        override suspend fun deleteMeal(id: String, version: Long) = error("Not exercised")
     }
 
     private companion object {

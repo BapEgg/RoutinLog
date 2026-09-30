@@ -38,10 +38,15 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
     val context = LocalContext.current
+    val mealState = mealModel?.state?.collectAsStateWithLifecycle()?.value
+    LaunchedEffect(accountState.userId, accountState.ready, accountState.profile?.timeZone, accountState.profile?.version) {
+        mealModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile != null }, accountState.profile?.timeZone, accountState.profile?.version)
+    }
+    LaunchedEffect(mealState?.notice) { mealState?.notice?.let { ui.notify(it); mealModel?.clearNotice() } }
     LaunchedEffect(accountState.routingVersion) {
         if(accountState.routingVersion>0 && !ui.previewMode && initialRoute==null) {
             if(accountState.ready && accountState.userId!=null) {
@@ -99,11 +104,11 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalAccount provides actions) { RoutineLogContent(model,initialRoute,ui) }
+    CompositionLocalProvider(LocalAccount provides actions) { RoutineLogContent(model,initialRoute,ui,mealModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun RoutineLogContent(model:RoutineLogViewModel,initialRoute:String?,ui:PreviewSession) {
+@Composable private fun RoutineLogContent(model:RoutineLogViewModel,initialRoute:String?,ui:PreviewSession,mealModel:MealViewModel?) {
     val account=LocalAccount.current
     val connection by model.state.collectAsStateWithLifecycle()
     var catalog by remember { mutableStateOf(false) }
@@ -111,7 +116,7 @@ import java.math.RoundingMode
     LaunchedEffect(initialRoute){if(BuildConfig.DEBUG && initialRoute in ScreenCatalog){ui.previewMode=true;ui.go(initialRoute!!)}}
     LaunchedEffect(ui.message){ui.message?.let {snackbar.showSnackbar(it);ui.message=null}}
     BackHandler(enabled=ui.route!="A01"){ui.back()}
-    val sheet=ui.route in listOf("F04","R06")
+    val sheet=ui.route=="R06" || (ui.route=="F04" && !ui.accountMode)
     val base=if(sheet)ScreenCatalog.getValue(ui.route).back!! else ui.route
     val keyboard=WindowInsets.ime.getBottom(LocalDensity.current)>0
     Scaffold(containerColor=Silver,snackbarHost={SnackbarHost(snackbar)},topBar={
@@ -134,7 +139,7 @@ import java.math.RoundingMode
                         if(!account.state.ready)UiButton("다시 연결",account.resume,primary=false)
                         else if(ui.accountMode&&id=="H04")UiButton("최신 기록 다시 불러오기",{account.loadDate(ui.get("body.date",ui.today().toString()))},primary=false)
                     }
-                    ScreenContent(id,ui);Spacer(Modifier.height(8.dp))
+                    ScreenContent(id,ui,mealModel);Spacer(Modifier.height(8.dp))
                 }
             }
         }
@@ -142,7 +147,7 @@ import java.math.RoundingMode
     if(sheet)ModalBottomSheet(onDismissRequest={ui.back()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=Silver) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically){Text(ScreenCatalog.getValue(ui.route).title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge);IconButton(onClick={ui.back()},modifier=Modifier.semantics{contentDescription="닫기"}){UiIcon("X")}}
-            ScreenContent(ui.route,ui);ScreenFooter(ui.route,ui);Spacer(Modifier.height(12.dp))
+            ScreenContent(ui.route,ui,mealModel);ScreenFooter(ui.route,ui);Spacer(Modifier.height(12.dp))
         }
     }
     if(catalog)AlertDialog(onDismissRequest={catalog=false},confirmButton={TextButton(onClick={catalog=false}){Text("닫기")}},title={Text("전체 화면 · ${ScreenCatalog.size}개")},text={
@@ -159,7 +164,12 @@ import java.math.RoundingMode
         } }
     }
 }
-@Composable private fun ScreenContent(id:String,ui:PreviewSession){
+@Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?){
+    // The outgoing animated screen must never switch to sample data after sign-out.
+    if(!ui.accountMode && !ui.previewMode && id!="A01")return
+    if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F13","F14") && mealModel!=null) {
+        LiveFoodScreens(id,ui,mealModel);return
+    }
     if(ui.accountMode&&id !in setOf("A01","A02","A03","A04","A05","A06","A07","A08","H01","H02","H03","H04","H05","S01","S02","S04","S06","E01")) {
         LiveFeaturePending(ui);return
     }

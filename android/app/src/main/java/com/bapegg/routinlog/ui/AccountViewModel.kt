@@ -29,7 +29,17 @@ class AccountViewModel(private val repository: AccountDataSource) : ViewModel() 
     private val mutableState = MutableStateFlow(AccountUiState())
     val state = mutableState.asStateFlow()
 
-    init { restore() }
+    init {
+        viewModelScope.launch {
+            repository.identity.collect { identity ->
+                if (identity == null && state.value.userId != null) {
+                    mutableState.value = AccountUiState(initializing = false,
+                        routingVersion = state.value.routingVersion + 1)
+                }
+            }
+        }
+        restore()
+    }
 
     fun restore() = operation {
         val identity = repository.restoreSession()

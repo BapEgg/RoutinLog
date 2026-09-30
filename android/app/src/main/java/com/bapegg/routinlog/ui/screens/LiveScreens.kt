@@ -32,6 +32,9 @@ import java.util.Locale
     UiCard {
         UiRow("신체 기록 · 변화", "저장된 ${account.state.records.size}일의 측정 기록",icon="ChartNoAxesCombined",onClick={ui.go("H05")})
     }
+    UiCard {
+        UiRow("식단 기록", "저장한 식사를 불러와 먹은 양만 바꿔요", icon="Utensils", onClick={ui.go("F01")})
+    }
     account.state.profile?.let {profile->
         UiCard {
             SectionTitle("내 시작 목표","수정",{ui.go("S02")})
@@ -45,7 +48,7 @@ import java.util.Locale
         }
     }
     UiButton("서버에서 새로 불러오기",account.refresh,primary=false)
-    MutedText("현재 연결된 기능은 시작 설정과 신체 기록이에요. 식단·운동·리포트는 샘플에서 먼저 확인할 수 있어요.")
+    MutedText("운동·주간 리포트는 샘플에서 먼저 확인할 수 있어요.")
 }
 
 @Composable internal fun LiveBodyHistory(ui:PreviewSession) {
@@ -87,7 +90,7 @@ import java.util.Locale
     UiCard {
         UiIcon("ClipboardList")
         SectionTitle("이 기능은 연결 중이에요.")
-        BodyText("시작 설정과 체중·허리 기록은 내 계정에 저장할 수 있어요. 이 화면의 기록 기능도 차례로 연결할게요.")
+        BodyText("시작 설정과 체중·허리·식단 기록은 내 계정에 저장할 수 있어요. 이 화면의 기록 기능도 차례로 연결할게요.")
         UiButton("내 기록으로",{ui.go("H01")})
         UiButton("샘플 화면 둘러보기",{ui.startPreview()},primary=false)
     }
@@ -98,7 +101,7 @@ import java.util.Locale
     UiCard {
         Badge("Google 로그인 완료")
         SectionTitle("나의 루틴로그")
-        MutedText("시작 설정과 신체 기록을 내 계정에 보관해요.")
+        MutedText("시작 설정과 신체·식단 기록을 내 계정에 보관해요.")
     }
     if(!accountPage)UiCard {
         UiRow("프로필 · 목표 · 단위", "저장한 기준 확인과 수정",icon="UserRound",onClick={ui.go("S02")})
@@ -119,7 +122,7 @@ import java.util.Locale
     val account=LocalAccount.current
     UiCard {
         SectionTitle("계정과 기록을 삭제할까요?")
-        BodyText("저장된 프로필·목표 변경 이력·체중·허리둘레·메모와 모든 기기의 로그인 연결을 삭제해요.")
+        BodyText("저장된 프로필·목표 변경 이력·체중·허리둘레·메모·등록 음식·저장 식사·기본 식단·섭취 기록과 모든 기기의 로그인 연결을 삭제해요.")
         MutedText("Google 계정 자체는 삭제하지 않아요. 삭제 후에는 기록을 되돌릴 수 없어요.")
         MutedText("먼저 Google에서 현재 계정의 본인 확인을 진행해요. 다른 계정을 선택하면 삭제되지 않아요.")
     }

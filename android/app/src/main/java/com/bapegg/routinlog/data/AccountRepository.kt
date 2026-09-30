@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource {
+) : AccountDataSource, MealDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -156,6 +156,38 @@ class AccountRepository internal constructor(
         authorized { api.deleteBody("Bearer ${it.accessToken}", date, version) }.checkStatus()
     }
 
+    override suspend fun listFoods(): List<FoodDto> = authorized { api.listFoods("Bearer ${it.accessToken}") }.required().items
+
+    override suspend fun saveFood(id: String, food: FoodWrite): FoodDto =
+        authorized { api.saveFood("Bearer ${it.accessToken}", id, food) }.required()
+
+    override suspend fun deleteFood(id: String, version: Long) {
+        authorized { api.deleteFood("Bearer ${it.accessToken}", id, version) }.checkStatus()
+    }
+
+    override suspend fun listMealTemplates(): List<MealTemplateDto> =
+        authorized { api.listMealTemplates("Bearer ${it.accessToken}") }.required().items
+
+    override suspend fun saveMealTemplate(id: String, template: MealTemplateWrite): MealTemplateDto =
+        authorized { api.saveMealTemplate("Bearer ${it.accessToken}", id, template) }.required()
+
+    override suspend fun deleteMealTemplate(id: String, version: Long) {
+        authorized { api.deleteMealTemplate("Bearer ${it.accessToken}", id, version) }.checkStatus()
+    }
+
+    override suspend fun getMealPlan(): MealPlanDto = authorized { api.getMealPlan("Bearer ${it.accessToken}") }.required()
+
+    override suspend fun saveMealPlan(plan: MealPlanWrite): MealPlanDto =
+        authorized { api.saveMealPlan("Bearer ${it.accessToken}", plan) }.required()
+
+    override suspend fun getMealDay(date: String): MealDayDto = authorized { api.getMealDay("Bearer ${it.accessToken}", date) }.required()
+
+    override suspend fun saveMeal(id: String, meal: MealWrite): MealDto = authorized { api.saveMeal("Bearer ${it.accessToken}", id, meal) }.required()
+
+    override suspend fun deleteMeal(id: String, version: Long) {
+        authorized { api.deleteMeal("Bearer ${it.accessToken}", id, version) }.checkStatus()
+    }
+
     /** Exactly one refresh for concurrent requests rejected with the same old access token. */
     private suspend fun <T> authorized(call: suspend (StoredSession) -> Response<T>): Response<T> {
         val initial = session ?: throw expired()
@@ -259,7 +291,7 @@ private fun malformed(): Nothing = throw AccountException(AccountErrorKind.SERVE
 private fun <T> Response<T>.required(): T { checkStatus(); return body() ?: malformed() }
 private fun Response<*>.checkStatus() { if (!isSuccessful) throw error() }
 private fun Response<*>.error(): AccountException {
-    val knownCodes = setOf("PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
+    val knownCodes = setOf("PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
     val serverCode = runCatching {
         errorBody()?.use { body ->
             val reader = body.charStream()
@@ -278,6 +310,7 @@ private fun Response<*>.error(): AccountException {
         serverCode in setOf("AUTH_NOT_CONFIGURED", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED") -> AccountErrorKind.CONFIGURATION
         status == 401 -> AccountErrorKind.EXPIRED
         status == 403 && serverCode in setOf("AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_CHALLENGE_INVALID") -> AccountErrorKind.CREDENTIAL
+        status == 403 && serverCode == "PROFILE_REQUIRED" -> AccountErrorKind.VALIDATION
         status == 400 || status == 422 -> AccountErrorKind.VALIDATION
         status == 409 -> AccountErrorKind.CONFLICT
         status == 404 -> AccountErrorKind.NOT_FOUND
@@ -287,8 +320,8 @@ private fun Response<*>.error(): AccountException {
         AccountErrorKind.CONFIGURATION -> "로그인 서버 설정이 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요."
         AccountErrorKind.EXPIRED -> "로그인이 만료됐어요. 다시 로그인해주세요."
         AccountErrorKind.CREDENTIAL -> if (serverCode == "AUTH_ACCOUNT_MISMATCH") "현재 로그인한 Google 계정으로 다시 확인해주세요." else "본인 확인을 완료하지 못했어요. Google 계정으로 다시 확인해주세요."
-        AccountErrorKind.VALIDATION -> "입력한 값과 필수 항목을 확인해주세요."
-        AccountErrorKind.CONFLICT -> "다른 곳에서 기록이 변경됐어요. 최신 기록을 다시 확인해주세요."
+        AccountErrorKind.VALIDATION -> if (serverCode == "PROFILE_REQUIRED") "내 기본 정보와 건강정보 동의를 완료한 뒤 식단을 기록해주세요." else "입력한 값과 필수 항목을 확인해주세요."
+        AccountErrorKind.CONFLICT -> if (serverCode == "RESOURCE_IN_USE") "식단이나 끼니에서 사용 중이에요. 연결을 해제한 뒤 삭제해주세요." else "다른 곳에서 기록이 변경됐어요. 최신 기록을 다시 확인해주세요."
         AccountErrorKind.NOT_FOUND -> "요청한 기록을 찾을 수 없어요."
         else -> "요청을 완료하지 못했어요. 잠시 후 다시 시도해주세요."
     }

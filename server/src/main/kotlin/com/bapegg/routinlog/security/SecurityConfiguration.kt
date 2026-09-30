@@ -24,6 +24,9 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/profile", "/api/v1/body-measurements").access(::accountAccess)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile", "/api/v1/body-measurements/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/me", "/api/v1/body-measurements/*").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/foods", "/api/v1/meal-templates", "/api/v1/meal-plan", "/api/v1/meal-records").access(::accountAccess)
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/foods/*", "/api/v1/meal-templates/*", "/api/v1/meal-plan", "/api/v1/meal-records/*").access(::accountAccess)
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/foods/*", "/api/v1/meal-templates/*", "/api/v1/meal-records/*").access(::accountAccess)
                     .anyRequest().denyAll()
             }
             .formLogin { it.disable() }
