@@ -19,6 +19,7 @@
 | Android Lint | 오류 0 | 남은 6개 경고는 고정한 의존성의 새 버전 안내 |
 | 실제 PostgreSQL | 연결 확인 | Docker 29.6.2, PostgreSQL 17.11, Flyway V1 성공, health UP, 비인가 기록 조회 401 |
 | HTML 안내서 | 브라우저 검사 통과 | 320/390/768/1440px, 5단계 전환·키보드·9개 펼쳐보기·로컬 링크, JS 오류 0 |
+| GitHub Actions | 서버·Android 모두 통과 | 코드 5778df9, [실행 36681071379](https://github.com/BapEgg/RoutinLog/actions/runs/36681071379): 서버 테스트·실제 PostgreSQL 기동, Android 빌드·테스트·Lint |
 
 서버 **19개**, Android **7개** 테스트가 통과했다. 이 결과는 Google 인증, 실제 사용자의 기록 저장, 개인정보 법적 적합성, 실제 휴대폰 동작을 검증했다는 뜻이 아니다. PostgreSQL은 초기 스키마 적용과 서버 기동까지 실제 환경에서 확인했고 사용자 기록 API 통합은 후속 구현 대상이다.
 
@@ -26,7 +27,6 @@
 
 | 항목 | 현재 상태 | 다음 확인 |
 |---|---|---|
-| GitHub Actions | 워크플로 파일 작성, 실제 실행 이력 없음 | 원격 저장소에 반영한 뒤 실행 결과 확인 |
 | 에뮬레이터·휴대폰 | 미검증 | 화면·글자 확대·뒤로가기·키보드·통신 실패 확인 |
 | Google·Health Connect·S3·OCR·AI | 미연결 | 각 기능 구현·자격증명·권한·개인정보 조건 준비 후 확인 |
 
@@ -40,4 +40,4 @@ SDK 누락을 해결한 뒤 APK·테스트·Lint를 실행했다. 첫 Lint에서
 
 SDK는 사용자 PC의 기본 `AppData/Local/Android/Sdk`에 설치했으며 사용자 환경변수 `ANDROID_HOME`과 도구 PATH를 설정했다. 개인 경로가 담긴 `android/local.properties`와 임의 로컬 DB 비밀번호가 담긴 `.env`는 Git에서 제외한다. Android Studio·에뮬레이터·시스템 이미지는 이번 설치에 포함하지 않았다.
 
-현재 로컬 소스는 전달받은 `https://github.com/BapEgg/RoutinLog.git` 원격과 연결되어 있으며, 이 검증 기록 작성 시 원격 푸시·앱 배포·유료 인프라 생성은 수행하지 않았다.
+초기 코드 `d2056bf7597df37477cb89ef1725c8bf513df721`를 `https://github.com/BapEgg/RoutinLog.git`의 main에 푸시했다. 첫 CI에서 SDK 설치 도구의 기본값이 폐기된 `tools` 패키지를 요청해 Android 준비 단계가 실패했다. `5778df9`에서 필요한 SDK 패키지를 명시한 뒤 서버·Android CI가 모두 통과했다. 이후 안내서 상태 갱신만 포함하는 커밋은 문서 경로 제외 규칙에 따라 CI를 다시 실행하지 않는다. 앱 스토어 배포·유료 인프라 생성은 수행하지 않았다. 문서 안내의 시작점은 Markdown README 대신 [ELI5 HTML 안내서](index.html)다.
