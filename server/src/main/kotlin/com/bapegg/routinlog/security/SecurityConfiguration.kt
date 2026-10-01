@@ -31,6 +31,7 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
                     .requestMatchers(HttpMethod.PUT, "/api/v1/workout-exercises/*", "/api/v1/workout-routines/*", "/api/v1/workout-plan", "/api/v1/workout-overrides/*", "/api/v1/workout-sessions/*", "/api/v1/workout-sessions/*/start").access(::accountAccess)
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/workout-exercises/*", "/api/v1/workout-routines/*", "/api/v1/workout-overrides/*", "/api/v1/workout-sessions/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.GET, "/api/v1/conditions").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/reports/weekly").access(::accountAccess)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/conditions/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/conditions/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.GET, "/api/v1/step-connection", "/api/v1/steps").access(::accountAccess)

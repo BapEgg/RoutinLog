@@ -14,6 +14,7 @@ import com.bapegg.routinlog.domain.NutritionMath
 import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.ReportViewModel
 import com.bapegg.routinlog.ui.StepsViewModel
 import com.bapegg.routinlog.steps.*
 import java.time.Instant
@@ -45,15 +46,17 @@ class AccountFlowTest {
     private var workouts: WorkoutViewModel? = null
     private var conditions: ConditionViewModel? = null
     private var steps: StepsViewModel? = null
+    private var reports: ReportViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
             val factory = viewModelFactory {
                 initializer { AccountViewModel(source) }
+                initializer { ReportViewModel(requireNotNull(reportFake)) }
                 initializer { RoutineLogViewModel(SystemStatusRepository.create("", debug = true)) }
                 initializer { MealViewModel(requireNotNull(mealFake)) }
                 initializer { WorkoutViewModel(requireNotNull(workoutFake)) }
@@ -62,12 +65,13 @@ class AccountFlowTest {
             }
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
+            reports = if(reportFake==null)null else ViewModelProvider(compose.activity,factory)[ReportViewModel::class.java]
             meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
             steps = if(stepFake==null)null else ViewModelProvider(compose.activity,factory)[StepsViewModel::class.java]
             conditions = if (conditionFake == null) null else ViewModelProvider(compose.activity, factory)[ConditionViewModel::class.java]
             workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
         if(stepFake!=null)compose.waitUntil(5_000){steps?.state?.value?.let { it.loaded&&!it.busy }==true}
         if (conditionFake != null) compose.waitUntil(5_000) { conditions?.state?.value?.let { it.loaded && !it.loading } == true }
@@ -78,6 +82,54 @@ class AccountFlowTest {
             assertEquals("H01", session().route)
             assertTrue(session().accountMode)
             assertFalse(session().previewMode)
+        }
+    }
+
+    @Test fun liveWeeklyReportShowsRecordedNutritionAndNeverSampleSuggestions() {
+        val fixture=ReportFixture();start(reportFake=fixture)
+        compose.onNodeWithText("리포트",useUnmergedTree=true).performClick()
+        compose.waitUntil(5_000){reports?.state?.value?.report!=null}
+        compose.onNodeWithText("한 주의 루틴").assertExists()
+        compose.onNodeWithText("4321").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("17,640").assertDoesNotExist()
+        compose.onNodeWithText("다음 주에는 무엇을 바꿀까요?").assertDoesNotExist()
+        capture("qa-live-weekly-report.png")
+        compose.runOnIdle { session().go("R02") }
+        compose.onNodeWithText("확인된 섭취량").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("4321 kcal").assertExists()
+        compose.runOnIdle { session().go("R04") }
+        compose.onNodeWithText("걸음 수").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithText("미수집").assertCountEquals(7)
+        compose.runOnIdle { source.expireFromAnotherFeature() }
+        compose.waitUntil(5_000){session().route=="A01"}
+        compose.runOnIdle { assertNull(reports?.state?.value?.report) }
+    }
+
+    @Test fun reportFailureCanRetryWithoutShowingSampleHealthValues() {
+        val fixture=ReportFixture().apply { fail=true };start(reportFake=fixture)
+        compose.onNodeWithText("리포트",useUnmergedTree=true).performClick()
+        compose.onNodeWithText("리포트 다시 불러오기").assertExists()
+        compose.onNodeWithText("17,640").assertDoesNotExist()
+        compose.runOnIdle { fixture.fail=false }
+        compose.onNodeWithText("리포트 다시 불러오기").performClick()
+        compose.waitUntil(5_000){reports?.state?.value?.report!=null}
+        compose.onNodeWithText("이전 주").assertExists()
+    }
+
+    private class ReportFixture:ReportDataSource {
+        var fail=false
+        override suspend fun weeklyReport(owner:String,week:String?):WeeklyReport {
+            if(fail)throw AccountException(AccountErrorKind.NETWORK,"연결을 확인해주세요.")
+            val from=LocalDate.parse(week ?: "2026-09-21")
+            val zero=NutrientTotal(BigDecimal.ZERO,0,0)
+            val totals=NutritionTotals(zero,zero,zero,zero,zero)
+            val average=ReportAverage(null,0,null,0,null)
+            val recorded=totals.copy(kcal=NutrientTotal(BigDecimal("4321"),1,0))
+            val meal=MealDto("meal",from.toString(),"slot","기록한 식사","EATEN",listOf(
+                LoggedMealItem("item","food","테스트 음식",basisGrams=BigDecimal("100"),nutrition=NutritionValues(kcal=BigDecimal("4321")),preparation="AS_SOLD",grams=BigDecimal("100"))),version=0,totals=recorded)
+            return WeeklyReport(from.toString(),from.plusDays(6).toString(),from.plusDays(6).toString(),"2026-09-28","Asia/Seoul","2026-09-30T00:00:00Z",
+                listOf(ReportNutrient("kcal",BigDecimal("16800"),7,BigDecimal("4321"),1,0)),
+                (0L..6L).map { MealDayDto(from.plusDays(it).toString(),if(it==0L)listOf(meal) else emptyList(),if(it==0L)recorded else totals,null) },emptyList(),emptyList(),average,average,emptyList(),emptyList())
         }
     }
 

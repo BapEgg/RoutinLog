@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource {
+) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -160,6 +160,7 @@ class AccountRepository internal constructor(
         if(session.userId!=owner)throw changedAccount()
         return "Bearer ${session.accessToken}"
     }
+    override suspend fun weeklyReport(owner:String,week:String?)=authorized { api.weeklyReport(stepAuth(it,owner),week) }.required()
     override suspend fun stepConnection(owner:String)=authorized { api.stepConnection(stepAuth(it,owner)) }.required()
     override suspend fun connectSteps(owner:String,id:String)=authorized { api.connectSteps(stepAuth(it,owner),ConnectSteps(id)) }.required()
     override suspend fun disconnectSteps(owner:String,id:String) { authorized { api.disconnectSteps(stepAuth(it,owner),id) }.checkStatus() }

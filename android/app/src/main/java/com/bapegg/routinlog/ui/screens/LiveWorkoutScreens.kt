@@ -601,12 +601,12 @@ private val loadLabels = linkedMapOf("TOTAL" to "전체 합계", "PER_HAND" to "
 private fun weekLabel(day: Int) = listOf("월", "화", "수", "목", "금", "토", "일").getOrElse(day - 1) { "" }
 private fun weightUnit(units: String) = if (units == "IMPERIAL") "lb" else "kg"
 private fun displayWeight(kg: BigDecimal?, units: String): String = kg?.let { WorkoutNumbers.kgToDisplay(it, units).stripTrailingZeros().toPlainString() }.orEmpty()
-private fun plannedSetText(set: PlannedSet, type: String, units: String): String = when (type) {
+internal fun plannedSetText(set: PlannedSet, type: String, units: String): String = when (type) {
     "WEIGHT_REPS" -> "${displayWeight(set.weightKg, units).ifBlank { "미정" }} ${weightUnit(units)} × ${set.reps?.toString() ?: "미정"}회"
     "REPS" -> "${set.reps?.toString() ?: "미정"}회"
     else -> "${set.durationSeconds?.toString() ?: "미정"}초"
 }
-private fun actualSetText(set: ActualSet, type: String, units: String): String = when (type) {
+internal fun actualSetText(set: ActualSet, type: String, units: String): String = when (type) {
     "WEIGHT_REPS" -> "${displayWeight(set.weightKg, units).ifBlank { "—" }} ${weightUnit(units)} × ${set.reps?.toString() ?: "—"}회"
     "REPS" -> "${set.reps?.toString() ?: "—"}회"
     else -> "${set.durationSeconds?.toString() ?: "—"}초"
