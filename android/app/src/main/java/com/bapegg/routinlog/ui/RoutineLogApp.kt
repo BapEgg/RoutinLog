@@ -38,15 +38,20 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
     val context = LocalContext.current
     val mealState = mealModel?.state?.collectAsStateWithLifecycle()?.value
+    val workoutState = workoutModel?.state?.collectAsStateWithLifecycle()?.value
     LaunchedEffect(accountState.userId, accountState.ready, accountState.profile?.timeZone, accountState.profile?.version) {
         mealModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile != null }, accountState.profile?.timeZone, accountState.profile?.version)
     }
     LaunchedEffect(mealState?.notice) { mealState?.notice?.let { ui.notify(it); mealModel?.clearNotice() } }
+    LaunchedEffect(accountState.userId, accountState.ready, accountState.profile?.timeZone, accountState.profile?.units) {
+        workoutModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile != null }, accountState.profile?.timeZone, accountState.profile?.units ?: "METRIC")
+    }
+    LaunchedEffect(workoutState?.notice) { workoutState?.notice?.let { ui.notify(it); workoutModel?.clearNotice() } }
     LaunchedEffect(accountState.routingVersion) {
         if(accountState.routingVersion>0 && !ui.previewMode && initialRoute==null) {
             if(accountState.ready && accountState.userId!=null) {
@@ -104,11 +109,11 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalAccount provides actions) { RoutineLogContent(model,initialRoute,ui,mealModel) }
+    CompositionLocalProvider(LocalAccount provides actions) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun RoutineLogContent(model:RoutineLogViewModel,initialRoute:String?,ui:PreviewSession,mealModel:MealViewModel?) {
+@Composable private fun RoutineLogContent(model:RoutineLogViewModel,initialRoute:String?,ui:PreviewSession,mealModel:MealViewModel?,workoutModel:WorkoutViewModel?) {
     val account=LocalAccount.current
     val connection by model.state.collectAsStateWithLifecycle()
     var catalog by remember { mutableStateOf(false) }
@@ -139,7 +144,7 @@ import java.math.RoundingMode
                         if(!account.state.ready)UiButton("다시 연결",account.resume,primary=false)
                         else if(ui.accountMode&&id=="H04")UiButton("최신 기록 다시 불러오기",{account.loadDate(ui.get("body.date",ui.today().toString()))},primary=false)
                     }
-                    ScreenContent(id,ui,mealModel);Spacer(Modifier.height(8.dp))
+                    ScreenContent(id,ui,mealModel,workoutModel);Spacer(Modifier.height(8.dp))
                 }
             }
         }
@@ -147,7 +152,7 @@ import java.math.RoundingMode
     if(sheet)ModalBottomSheet(onDismissRequest={ui.back()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=Silver) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically){Text(ScreenCatalog.getValue(ui.route).title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge);IconButton(onClick={ui.back()},modifier=Modifier.semantics{contentDescription="닫기"}){UiIcon("X")}}
-            ScreenContent(ui.route,ui,mealModel);ScreenFooter(ui.route,ui);Spacer(Modifier.height(12.dp))
+            ScreenContent(ui.route,ui,mealModel,workoutModel);ScreenFooter(ui.route,ui);Spacer(Modifier.height(12.dp))
         }
     }
     if(catalog)AlertDialog(onDismissRequest={catalog=false},confirmButton={TextButton(onClick={catalog=false}){Text("닫기")}},title={Text("전체 화면 · ${ScreenCatalog.size}개")},text={
@@ -164,11 +169,14 @@ import java.math.RoundingMode
         } }
     }
 }
-@Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?){
+@Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?,workoutModel:WorkoutViewModel?){
     // The outgoing animated screen must never switch to sample data after sign-out.
     if(!ui.accountMode && !ui.previewMode && id!="A01")return
     if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F13","F14") && mealModel!=null) {
         LiveFoodScreens(id,ui,mealModel);return
+    }
+    if(ui.accountMode && id in setOf("W01","W04","W05","W06","W07","W08","W09","W10","W11","W13","W14","W16") && workoutModel!=null) {
+        LiveWorkoutScreens(id,ui,workoutModel);return
     }
     if(ui.accountMode&&id !in setOf("A01","A02","A03","A04","A05","A06","A07","A08","H01","H02","H03","H04","H05","S01","S02","S04","S06","E01")) {
         LiveFeaturePending(ui);return
@@ -191,11 +199,11 @@ private fun hasFooter(id:String)=id !in setOf("A01","H01","H02","H03","H05","H06
         Row(verticalAlignment=Alignment.CenterVertically) {
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                 if(id=="H01")Text("나만의 루틴로그",color=Muted,fontSize=11.sp)
-                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",ui.today().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else screen.title
+                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",ui.today().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else if(ui.accountMode)when(id){"W01"->"나의 운동";"W06"->"운동 정보·내 기록";"W08"->"운동 기록";"W09"->"세트 기록";"W10"->"세트 사이 휴식";"W14"->"날짜별 일정 변경";else->screen.title}else screen.title
                 Text(title,style=if(root)MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,modifier=Modifier.semantics{heading()}.then(if(id=="H01")Modifier.clickable{ui.go("H03")}else Modifier))
                 if(root&&id=="H01")Text("나의 일상을 차곡차곡",fontSize=12.sp,color=Muted)
             }
-            if(root)Surface(shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Border),color=Color.White){IconButton(onClick={ui.go(if(id=="H01")"S01"else"H03")},modifier=Modifier.semantics{contentDescription=if(id=="H01")"설정"else"달력"}){UiIcon(if(id=="H01")"Settings"else"CalendarDays")}}
+            if(root && !(ui.accountMode && id=="W01"))Surface(shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Border),color=Color.White){IconButton(onClick={ui.go(if(id=="H01")"S01"else"H03")},modifier=Modifier.semantics{contentDescription=if(id=="H01")"설정"else"달력"}){UiIcon(if(id=="H01")"Settings"else"CalendarDays")}}
         }
         if(step>0)ProgressLine(step/7f)
         Spacer(Modifier.height(4.dp))

@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource, MealDataSource {
+) : AccountDataSource, MealDataSource, WorkoutDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -188,6 +188,22 @@ class AccountRepository internal constructor(
         authorized { api.deleteMeal("Bearer ${it.accessToken}", id, version) }.checkStatus()
     }
 
+    override suspend fun listExercises(): List<ExerciseDto> = authorized { api.listExercises("Bearer ${it.accessToken}") }.required().items
+    override suspend fun saveExercise(id: String, exercise: ExerciseWrite): ExerciseDto = authorized { api.saveExercise("Bearer ${it.accessToken}", id, exercise) }.required()
+    override suspend fun deleteExercise(id: String, version: Long) { authorized { api.deleteExercise("Bearer ${it.accessToken}", id, version) }.checkStatus() }
+    override suspend fun listRoutines(): List<RoutineDto> = authorized { api.listRoutines("Bearer ${it.accessToken}") }.required().items
+    override suspend fun saveRoutine(id: String, routine: RoutineWrite): RoutineDto = authorized { api.saveRoutine("Bearer ${it.accessToken}", id, routine) }.required()
+    override suspend fun deleteRoutine(id: String, version: Long) { authorized { api.deleteRoutine("Bearer ${it.accessToken}", id, version) }.checkStatus() }
+    override suspend fun getWorkoutPlan(): WorkoutPlanDto = authorized { api.getWorkoutPlan("Bearer ${it.accessToken}") }.required()
+    override suspend fun saveWorkoutPlan(plan: WorkoutPlanWrite): WorkoutPlanDto = authorized { api.saveWorkoutPlan("Bearer ${it.accessToken}", plan) }.required()
+    override suspend fun saveWorkoutOverride(date: String, override: WorkoutOverrideWrite): WorkoutOverrideDto = authorized { api.saveWorkoutOverride("Bearer ${it.accessToken}", date, override) }.required()
+    override suspend fun deleteWorkoutOverride(date: String, version: Long) { authorized { api.deleteWorkoutOverride("Bearer ${it.accessToken}", date, version) }.checkStatus() }
+    override suspend fun getWorkoutDays(from: String, to: String): List<WorkoutDayDto> = authorized { api.getWorkoutDays("Bearer ${it.accessToken}", from, to) }.required().items
+    override suspend fun startWorkoutSession(id: String, start: WorkoutStartWrite): WorkoutSessionDto = authorized { api.startWorkoutSession("Bearer ${it.accessToken}", id, start) }.required()
+    override suspend fun saveWorkoutSession(id: String, session: WorkoutSessionWrite): WorkoutSessionDto = authorized { api.saveWorkoutSession("Bearer ${it.accessToken}", id, session) }.required()
+    override suspend fun deleteWorkoutSession(id: String, version: Long) { authorized { api.deleteWorkoutSession("Bearer ${it.accessToken}", id, version) }.checkStatus() }
+    override suspend fun getWorkoutHistory(exerciseId: String, before: String): List<WorkoutHistoryItem> = authorized { api.getWorkoutHistory("Bearer ${it.accessToken}", exerciseId, before) }.required().items
+
     /** Exactly one refresh for concurrent requests rejected with the same old access token. */
     private suspend fun <T> authorized(call: suspend (StoredSession) -> Response<T>): Response<T> {
         val initial = session ?: throw expired()
@@ -291,7 +307,7 @@ private fun malformed(): Nothing = throw AccountException(AccountErrorKind.SERVE
 private fun <T> Response<T>.required(): T { checkStatus(); return body() ?: malformed() }
 private fun Response<*>.checkStatus() { if (!isSuccessful) throw error() }
 private fun Response<*>.error(): AccountException {
-    val knownCodes = setOf("PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
+    val knownCodes = setOf("PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
     val serverCode = runCatching {
         errorBody()?.use { body ->
             val reader = body.charStream()
@@ -320,8 +336,13 @@ private fun Response<*>.error(): AccountException {
         AccountErrorKind.CONFIGURATION -> "로그인 서버 설정이 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요."
         AccountErrorKind.EXPIRED -> "로그인이 만료됐어요. 다시 로그인해주세요."
         AccountErrorKind.CREDENTIAL -> if (serverCode == "AUTH_ACCOUNT_MISMATCH") "현재 로그인한 Google 계정으로 다시 확인해주세요." else "본인 확인을 완료하지 못했어요. Google 계정으로 다시 확인해주세요."
-        AccountErrorKind.VALIDATION -> if (serverCode == "PROFILE_REQUIRED") "내 기본 정보와 건강정보 동의를 완료한 뒤 식단을 기록해주세요." else "입력한 값과 필수 항목을 확인해주세요."
-        AccountErrorKind.CONFLICT -> if (serverCode == "RESOURCE_IN_USE") "식단이나 끼니에서 사용 중이에요. 연결을 해제한 뒤 삭제해주세요." else "다른 곳에서 기록이 변경됐어요. 최신 기록을 다시 확인해주세요."
+        AccountErrorKind.VALIDATION -> if (serverCode == "PROFILE_REQUIRED") "내 기본 정보와 건강정보 동의를 완료한 뒤 기록해주세요." else "입력한 값과 필수 항목을 확인해주세요."
+        AccountErrorKind.CONFLICT -> when (serverCode) {
+            "RESOURCE_IN_USE" -> "다른 계획에서 사용 중이에요. 연결을 해제한 뒤 삭제해주세요."
+            "SESSION_EXISTS" -> "이 날짜의 운동 기록이 이미 있어요. 다시 불러온 뒤 이어서 기록해주세요."
+            "REPLACEMENT_REQUIRES_NEW_ENTRY" -> "완료한 세트는 기존 종목에 남기고, 대체 종목을 새로 추가해주세요."
+            else -> "다른 곳에서 기록이 변경됐어요. 최신 기록을 다시 확인해주세요."
+        }
         AccountErrorKind.NOT_FOUND -> "요청한 기록을 찾을 수 없어요."
         else -> "요청을 완료하지 못했어요. 잠시 후 다시 시도해주세요."
     }

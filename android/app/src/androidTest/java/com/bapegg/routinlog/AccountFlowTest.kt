@@ -14,6 +14,7 @@ import com.bapegg.routinlog.domain.NutritionMath
 import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.WorkoutViewModel
 import com.bapegg.routinlog.ui.PreviewSession
 import com.bapegg.routinlog.ui.RoutineLogApp
 import com.bapegg.routinlog.ui.RoutineLogViewModel
@@ -37,10 +38,11 @@ class AccountFlowTest {
     private lateinit var account: AccountViewModel
     private lateinit var source: FakeAccountDataSource
     private var meals: MealViewModel? = null
+    private var workouts: WorkoutViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
@@ -48,14 +50,17 @@ class AccountFlowTest {
                 initializer { AccountViewModel(source) }
                 initializer { RoutineLogViewModel(SystemStatusRepository.create("", debug = true)) }
                 initializer { MealViewModel(requireNotNull(mealFake)) }
+                initializer { WorkoutViewModel(requireNotNull(workoutFake)) }
             }
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
             meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
+            workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
         if (mealFake != null) compose.waitUntil(5_000) { meals?.state?.value?.let { it.loaded && !it.loading } == true }
+        if (workoutFake != null) compose.waitUntil(5_000) { workouts?.state?.value?.let { it.loaded && !it.loading } == true }
         compose.waitForIdle()
         compose.runOnIdle {
             assertEquals("H01", session().route)
@@ -392,6 +397,61 @@ class AccountFlowTest {
         }
     }
 
+    @Test fun realAppWorkoutTabRegistersExerciseAndClearsDraftWhenAccountExpires() {
+        val workoutSource = WrapperWorkoutDataSource()
+        start(workoutFake = workoutSource)
+        val workoutModel = requireNotNull(workouts)
+        compose.onNodeWithText("운동", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("이번 주 일정").assertExists()
+        capture("qa-live-workout-app.png")
+        compose.onNodeWithText("첫 운동 등록").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("운동 이름").performScrollTo().performTextReplacement("통합 흐름 테스트 운동")
+        compose.onNodeWithText("내 운동 저장").performScrollTo().performClick()
+        compose.waitForIdle()
+        // Wait for the transient saved-message overlay before touching a bottom-edge button.
+        val navigation = compose.runOnIdle { session() }
+        compose.waitUntil(10_000) { navigation.message == null }
+        compose.onNodeWithText("새 루틴 만들기").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals("W04", session().route)
+            assertNotNull(workoutModel.state.value.routineDraft)
+        }
+        compose.onNodeWithContentDescription("루틴 이름").performTextReplacement("저장하지 않은 내 루틴")
+        compose.onNodeWithText("루틴에 운동 추가").performScrollTo().performClick()
+        compose.onNodeWithText("루틴에 추가").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals("W04", session().route)
+            assertTrue(session().accountMode)
+            assertFalse(session().previewMode)
+            assertEquals(TEST_USER_ID, workoutModel.state.value.userId)
+            assertEquals(1, workoutModel.state.value.exercises.size)
+            assertEquals("저장하지 않은 내 루틴", workoutModel.state.value.routineDraft?.name)
+            assertEquals(1, workoutModel.state.value.routineDraft?.entries?.size)
+            source.expireFromAnotherFeature()
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("로그인 없이 둘러보기").assertExists()
+        compose.onNodeWithText("통합 흐름 테스트 운동").assertDoesNotExist()
+        compose.runOnIdle {
+            assertNull(account.state.value.userId)
+            assertEquals("A01", session().route)
+            assertTrue(session().values.isEmpty())
+            val cleared = workoutModel.state.value
+            assertNull(cleared.userId)
+            assertTrue(cleared.exercises.isEmpty())
+            assertTrue(cleared.routines.isEmpty())
+            assertTrue(cleared.days.isEmpty())
+            assertTrue(cleared.history.isEmpty())
+            assertNull(cleared.plan)
+            assertNull(cleared.routineDraft)
+            assertNull(cleared.restDeadlineElapsedMs)
+            assertFalse(cleared.loaded)
+            // Only local state is cleared by expiry; persisted definitions stay intact.
+            assertEquals(1, workoutSource.exercises.size)
+        }
+    }
+
     private fun assertAccountStillLoaded() {
         assertEquals(TEST_USER_ID, account.state.value.userId)
         assertEquals(TEST_USER_ID, source.identity.value?.userId)
@@ -519,6 +579,29 @@ class AccountFlowTest {
         override suspend fun saveMealPlan(plan: MealPlanWrite): MealPlanDto = error("Not exercised")
         override suspend fun saveMeal(id: String, meal: MealWrite): MealDto = error("Not exercised")
         override suspend fun deleteMeal(id: String, version: Long) = error("Not exercised")
+    }
+
+    private class WrapperWorkoutDataSource : WorkoutDataSource {
+        val exercises = mutableListOf<ExerciseDto>()
+        override suspend fun listExercises() = exercises.toList()
+        override suspend fun listRoutines() = emptyList<RoutineDto>()
+        override suspend fun getWorkoutPlan() = WorkoutPlanDto((1..7).map { WorkoutPlanSlot(it) })
+        override suspend fun getWorkoutDays(from: String, to: String): List<WorkoutDayDto> =
+            LocalDate.parse(from).datesUntil(LocalDate.parse(to).plusDays(1)).map { WorkoutDayDto(it.toString()) }.toList()
+        override suspend fun saveExercise(id: String, exercise: ExerciseWrite): ExerciseDto {
+            check(exercise.version == null && exercises.none { it.id == id })
+            return ExerciseDto(id, exercise.name, exercise.equipment, exercise.target, exercise.recordType, exercise.loadConvention, 0).also { exercises += it }
+        }
+        override suspend fun getWorkoutHistory(exerciseId: String, before: String) = emptyList<WorkoutHistoryItem>()
+        override suspend fun deleteExercise(id: String, version: Long): Unit = error("Not exercised")
+        override suspend fun saveRoutine(id: String, routine: RoutineWrite): RoutineDto = error("Not exercised")
+        override suspend fun deleteRoutine(id: String, version: Long): Unit = error("Not exercised")
+        override suspend fun saveWorkoutPlan(plan: WorkoutPlanWrite): WorkoutPlanDto = error("Not exercised")
+        override suspend fun saveWorkoutOverride(date: String, override: WorkoutOverrideWrite): WorkoutOverrideDto = error("Not exercised")
+        override suspend fun deleteWorkoutOverride(date: String, version: Long): Unit = error("Not exercised")
+        override suspend fun startWorkoutSession(id: String, start: WorkoutStartWrite): WorkoutSessionDto = error("Not exercised")
+        override suspend fun saveWorkoutSession(id: String, session: WorkoutSessionWrite): WorkoutSessionDto = error("Not exercised")
+        override suspend fun deleteWorkoutSession(id: String, version: Long): Unit = error("Not exercised")
     }
 
     private companion object {
