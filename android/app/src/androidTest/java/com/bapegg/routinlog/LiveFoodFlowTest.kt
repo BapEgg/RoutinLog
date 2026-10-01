@@ -1,6 +1,10 @@
 package com.bapegg.routinlog
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import androidx.core.content.FileProvider
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +22,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bapegg.routinlog.data.*
 import com.bapegg.routinlog.domain.NutritionMath
+import com.bapegg.routinlog.food.LabelImageReader
 import com.bapegg.routinlog.ui.MealViewModel
 import com.bapegg.routinlog.ui.PreviewSession
 import com.bapegg.routinlog.ui.screens.LiveFoodScreens
@@ -235,6 +240,57 @@ class LiveFoodFlowTest {
         compose.onNodeWithText("확인하고 내 음식에 추가").assertDoesNotExist()
         compose.onNodeWithText("g 기준 영양정보를 직접 등록해주세요.").assertExists()
         compose.runOnIdle { assertTrue(source.foods.isEmpty()) }
+    }
+
+    @Test fun nutritionPhotoRequiresReviewAndSavesCorrectionsWithoutInventingMissingNutrients() {
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(appContext.cacheDir, "nutrition-labels").apply { mkdirs() }
+        val photo = File.createTempFile("ui-ocr-test-", ".png", directory)
+        val bitmap = Bitmap.createBitmap(1000, 780, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap).apply { drawColor(Color.WHITE) }
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = 48f }
+        listOf("영양정보", "80g당 160kcal", "단백질 20g", "지방 0g").forEachIndexed { i, text -> canvas.drawText(text, 70f, 120f + i * 160, paint) }
+        photo.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
+        val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.label-photos", photo)
+        start(); compose.runOnIdle {
+            ui.go("F09")
+            model.readLabel(model.state.value.userId!!, uri.toString(), { photo.delete(); Unit }) { LabelImageReader.read(appContext, uri) }
+        }
+        compose.waitUntil(20_000) { model.state.value.labelDraft != null }
+        click("읽은 내용 확인")
+        compose.onNodeWithText("선택한 원본 사진").performScrollTo()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("확인할 영양성분표 원본").fetchSemanticsNodes().isNotEmpty() }
+        capture("qa-nutrition-label-source.png")
+        enter("음식 이름", "사진으로 등록한 테스트 제품")
+        enter("단백질", "21")
+        compose.onNodeWithContentDescription("기준량").assertTextContains("80")
+        compose.onNodeWithText("내 음식에 저장").assertIsNotEnabled()
+        compose.runOnIdle { assertTrue(source.foods.isEmpty()); assertTrue(source.mealWrites.isEmpty()) }
+        click("원본의 g 기준량과 영양정보를 확인했어요")
+        capture("qa-nutrition-label-confirm.png")
+        click("내 음식에 저장")
+        compose.waitUntil(5_000) { ui.route == "F06" }
+        compose.runOnIdle {
+            val food = source.foods.values.single()
+            assertDecimal("80", food.basisGrams); assertDecimal("160", food.nutrition.kcal)
+            assertDecimal("21", food.nutrition.proteinG); assertDecimal("0", food.nutrition.fatG)
+            assertNull(food.nutrition.carbsG); assertNull(food.nutrition.fiberG)
+            assertTrue(food.sourceNote!!.contains("사진")); assertTrue(source.mealWrites.isEmpty())
+            assertNull(model.state.value.labelDraft)
+            assertFalse(photo.exists())
+        }
+    }
+
+    @Test fun failedNutritionPhotoOffersManualEntryWithoutCreatingFood() {
+        start(); compose.runOnIdle {
+            ui.go("F09")
+            model.readLabel(model.state.value.userId!!, "content://test/missing") { error("Unreadable photo") }
+        }
+        compose.waitUntil(5_000) { model.state.value.labelError != null }
+        compose.onNodeWithText("읽은 내용 확인").assertDoesNotExist()
+        click("직접 입력하기")
+        compose.runOnIdle { assertEquals("F13", ui.route); assertNull(model.state.value.labelImage); assertTrue(source.foods.isEmpty()) }
+        compose.onNodeWithContentDescription("기준량").assertTextContains("")
     }
 
     private fun capture(name: String) {

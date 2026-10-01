@@ -3,6 +3,7 @@ package com.bapegg.routinlog.ui
 import androidx.lifecycle.viewModelScope
 import com.bapegg.routinlog.data.*
 import com.bapegg.routinlog.domain.NutritionMath
+import com.bapegg.routinlog.domain.NutritionLabelParser
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -345,6 +346,38 @@ class MealViewModelTest {
     }
 
     private fun d(value: String) = BigDecimal(value)
+    @Test fun `label read stays unsaved until explicit food confirmation and cleans up on logout`() = runTest(dispatcher) {
+        load(); var cleaned = false
+        viewModel.readLabel("account-a", "content://test/label", { cleaned = true }) { NutritionLabelParser.parse("80g당 160kcal\n단백질 20g") }
+        advanceUntilIdle()
+        assertNotNull(viewModel.state.value.labelDraft)
+        assertEquals(1, viewModel.state.value.foods.size)
+        assertTrue(repository.mealWrites.isEmpty())
+        assertFalse(cleaned)
+        viewModel.bind(null)
+        assertTrue(cleaned); assertNull(viewModel.state.value.labelDraft); assertNull(viewModel.state.value.labelImage)
+    }
+    @Test fun `late label read cannot leak into another account or replace a newer image`() = runTest(dispatcher) {
+        load(); val gate = CompletableDeferred<com.bapegg.routinlog.domain.NutritionLabelDraft>()
+        var cleaned = false
+        viewModel.readLabel("account-a", "content://test/old", { cleaned = true }) { gate.await() }; runCurrent()
+        viewModel.readLabel("account-a", "content://test/new") { NutritionLabelParser.parse("100g당 200kcal") }
+        advanceUntilIdle(); assertTrue(cleaned)
+        gate.complete(NutritionLabelParser.parse("80g당 160kcal")); advanceUntilIdle()
+        assertEquals("content://test/new", viewModel.state.value.labelImage)
+        viewModel.bind("account-b"); advanceUntilIdle()
+        var refused = false
+        viewModel.readLabel("account-a", "content://test/old-owner", { refused = true }) { error("Must not run") }
+        assertTrue(refused); assertNull(viewModel.state.value.labelDraft)
+    }
+    @Test fun `failed label read keeps an actionable error and another photo can succeed`() = runTest(dispatcher) {
+        load()
+        viewModel.readLabel("account-a", "content://test/broken") { error("Decode failed") }; advanceUntilIdle()
+        assertFalse(viewModel.state.value.labelReading); assertNotNull(viewModel.state.value.labelError)
+        assertNull(viewModel.state.value.labelDraft)
+        viewModel.readLabel("account-a", "content://test/new") { NutritionLabelParser.parse("100g당\n지방 0g") }; advanceUntilIdle()
+        assertNull(viewModel.state.value.labelError); assertEquals(BigDecimal.ZERO, viewModel.state.value.labelDraft?.nutrition?.fatG)
+    }
     private fun catalogFood()=CatalogFood("TEST-001","테스트 공공식품",null,"음식","80g",d("80"),"g",NutritionValues(kcal=d("160")),"테스트 출처","2026-08-28","https://example.invalid","rev")
     @Test fun `catalog pagination keeps previous results and saves only confirmed food without recording it`()=runTest(dispatcher) {
         load();repository.catalogResult=CatalogSearch(listOf(catalogFood()),true,true,0)

@@ -89,6 +89,7 @@ import java.math.RoundingMode
     LaunchedEffect(conditionState?.notice) { conditionState?.notice?.let { ui.notify(it);conditionModel?.clearNotice() } }
     val context = LocalContext.current
     val mealState = mealModel?.state?.collectAsStateWithLifecycle()?.value
+    LaunchedEffect(ui.route) { if (ui.route !in setOf("F09", "F10")) mealModel?.clearLabel() }
     val workoutState = workoutModel?.state?.collectAsStateWithLifecycle()?.value
     LaunchedEffect(accountState.userId, accountState.ready, accountState.profile?.timeZone, accountState.profile?.version) {
         mealModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile != null }, accountState.profile?.timeZone, accountState.profile?.version)
@@ -223,7 +224,7 @@ import java.math.RoundingMode
     if(ui.accountMode && id in setOf("R01","R02","R03","R04")) { LocalReports.current?.let { LiveReportScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("H06","S03")) { LocalSteps.current?.let { LiveStepsScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id=="H07") { LocalConditions.current?.let { LiveConditionScreen(ui,it) } ?: LiveFeaturePending(ui);return }
-    if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F13","F14") && mealModel!=null) {
+    if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F09","F10","F13","F14") && mealModel!=null) {
         LiveFoodScreens(id,ui,mealModel);return
     }
     if(ui.accountMode && id in setOf("W01","W04","W05","W06","W07","W08","W09","W10","W11","W13","W14","W16") && workoutModel!=null) {

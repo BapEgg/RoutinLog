@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bapegg.routinlog.data.*
 import com.bapegg.routinlog.domain.NutritionMath
+import com.bapegg.routinlog.domain.NutritionLabelDraft
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,8 @@ data class MealUiState(
     val error: String? = null, val notice: String? = null,
     val catalog:CatalogSearch?=null,val catalogQuery:String="",val catalogLoading:Boolean=false,
     val catalogError:String?=null,val catalogSelected:CatalogFood?=null,
+    val labelImage: String? = null, val labelDraft: NutritionLabelDraft? = null,
+    val labelReading: Boolean = false, val labelError: String? = null,
 )
 data class MealDraft(val id: String, val date: String, val slotId: String, val slotLabel: String,
     val items: List<MealDraftItem>, val note: String, val version: Long?)
@@ -38,6 +41,33 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     private var refreshAfterWrite = false
     private var catalogJob:Job?=null
     private var catalogEpoch=0L
+    private var labelJob: Job? = null
+    private var labelEpoch = 0L
+    private var labelCleanup: (() -> Unit)? = null
+
+    fun clearLabel() {
+        labelEpoch++; labelJob?.cancel(); labelJob = null
+        labelCleanup?.invoke(); labelCleanup = null
+        mutableState.update { it.copy(labelImage = null, labelDraft = null, labelReading = false, labelError = null) }
+    }
+
+    fun readLabel(owner: String, image: String, cleanup: () -> Unit = {}, read: suspend () -> NutritionLabelDraft) {
+        if (state.value.userId != owner || state.value.busy) { cleanup(); return }
+        clearLabel(); labelCleanup = cleanup
+        val epoch = labelEpoch
+        mutableState.update { it.copy(labelImage = image, labelReading = true) }
+        labelJob = viewModelScope.launch {
+            try {
+                val draft = read(); currentCoroutineContext().ensureActive()
+                if (epoch == labelEpoch && state.value.userId == owner) mutableState.update { it.copy(labelDraft = draft) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (epoch == labelEpoch) mutableState.update { it.copy(labelError = "사진의 영양정보를 읽지 못했어요. 글씨가 선명한 사진으로 다시 선택하거나 직접 입력해주세요.") }
+            } finally { if (epoch == labelEpoch) mutableState.update { it.copy(labelReading = false) } }
+        }
+    }
+
+    override fun onCleared() { labelCleanup?.invoke(); labelCleanup = null; super.onCleared() }
 
     fun bind(userId: String?, timeZone: String? = null, profileVersion: Long? = null) {
         val nextZone = timeZone?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
@@ -52,6 +82,7 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
         }
         refreshAfterWrite = false
         generation++
+        clearLabel()
         catalogEpoch++;catalogJob?.cancel()
         readJob?.cancel(); writeJob?.cancel()
         mutableState.value = MealUiState(userId = userId, date = LocalDate.now(zone).toString())
