@@ -164,6 +164,20 @@ class MealRepositoryTest {
     }
 
     private fun take(): RecordedRequest = checkNotNull(server.takeRequest(2, TimeUnit.SECONDS))
+    @Test fun `catalog search encodes query and save sends only revision and preparation`()=runBlocking {
+        server.enqueue(json("""{"items":[],"hasMore":false,"available":true,"page":2}"""))
+        repository.searchCatalog("fake-user","닭가슴살 업체",2)
+        val search=take();assertEquals("닭가슴살 업체",search.requestUrl!!.queryParameter("q"));assertEquals("2",search.requestUrl!!.queryParameter("page"))
+        server.enqueue(json(foodJson.replace("USER_ENTERED","PUBLIC_DB")))
+        val saved=repository.saveCatalogFood("fake-user","TEST-001",CatalogSave("revision","RAW"))
+        val request=take();assertEquals("POST",request.method);assertEquals("/api/v1/food-catalog/TEST-001/save",request.path)
+        val value=body(request);assertEquals(setOf("revision","preparation"),value.keySet());assertEquals("PUBLIC_DB",saved.source)
+    }
+    @Test fun `catalog operations reject a different owner before any network request`()=runBlocking {
+        val error=failure { repository.searchCatalog("another-user","닭가슴살",0) }
+        assertEquals(AccountErrorKind.CANCELLED,error.kind)
+        assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
+    }
     private fun body(request: RecordedRequest) = JsonParser.parseString(request.body.readUtf8()).asJsonObject
     private fun json(value: String, code: Int = 200) = MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(value)
     private fun tokens(suffix: String) = """{"accessToken":"fake-access-$suffix","refreshToken":"fake-refresh-$suffix","expiresIn":3600,"userId":"fake-user"}"""

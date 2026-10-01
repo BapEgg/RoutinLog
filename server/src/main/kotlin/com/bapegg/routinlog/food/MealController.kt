@@ -15,7 +15,17 @@ import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/v1")
-class MealController(private val meals: MealService) {
+class MealController(private val meals: MealService,private val catalog:FoodCatalog) {
+    @GetMapping("/food-catalog")
+    fun catalog(@AuthenticationPrincipal user:AuthenticatedUser,@RequestParam q:String,@RequestParam(defaultValue="0") page:Int):ResponseEntity<CatalogSearch> {
+        meals.requireActiveAccount(user.userId);return privateResponse(catalog.search(q,page))
+    }
+    @GetMapping("/food-catalog/{id}")
+    fun catalogFood(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable id:String):ResponseEntity<CatalogFood> {
+        meals.requireActiveAccount(user.userId);return privateResponse(catalog.get(id))
+    }
+    @PostMapping("/food-catalog/{id}/save")
+    fun saveCatalogFood(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable id:String,@RequestBody request:CatalogSave)=privateResponse(meals.saveCatalogFood(user.userId,id,request))
     @GetMapping("/foods")
     fun foods(@AuthenticationPrincipal user: AuthenticatedUser)=privateResponse(meals.foods(user.userId))
     @PutMapping("/foods/{id}")

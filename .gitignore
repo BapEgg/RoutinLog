@@ -21,6 +21,8 @@ Thumbs.db
 .gradle-cache/
 *.log
 captures/
+**/__pycache__/
+.catalog-data/
 
 # Wrapper JARs are source-controlled bootstrap tools, not build output.
 !**/gradle/wrapper/gradle-wrapper.jar

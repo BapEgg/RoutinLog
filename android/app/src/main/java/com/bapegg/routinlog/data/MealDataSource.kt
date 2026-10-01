@@ -2,6 +2,8 @@ package com.bapegg.routinlog.data
 
 /** Authenticated online storage. The UI retains drafts; server responses confirm actual saves. */
 interface MealDataSource {
+    suspend fun searchCatalog(owner:String,query:String,page:Int):CatalogSearch = throw UnsupportedOperationException("Catalog unavailable")
+    suspend fun saveCatalogFood(owner:String,id:String,write:CatalogSave):FoodDto = throw UnsupportedOperationException("Catalog unavailable")
     suspend fun listFoods(): List<FoodDto>
     suspend fun saveFood(id: String, food: FoodWrite): FoodDto
     suspend fun deleteFood(id: String, version: Long)

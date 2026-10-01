@@ -2,6 +2,8 @@ package com.bapegg.routinlog.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -47,15 +49,7 @@ internal fun LiveFoodScreens(id: String, ui: PreviewSession, model: MealViewMode
         "F04" -> LiveMealAmount(ui, model, state)
         "F06" -> LiveFoodLibrary(ui, model, state)
         "F07" -> LiveFoodDetail(ui, state)
-        "F08" -> {
-            UiCard {
-                SectionTitle("내가 확인한 영양정보로 등록해요")
-                BodyText("제품 영양성분표의 기준량과 영양정보를 그대로 입력해주세요.")
-                MutedText("표시되지 않은 영양소는 빈칸으로 남겨요. 0으로 계산하지 않아요.")
-                UiButton("음식 직접 등록", { openFoodForm(ui, null, "F06") })
-            }
-            MutedText("식품 검색·사진 인식·상품 주소 등록은 아직 제공하지 않아요.")
-        }
+        "F08" -> LiveCatalog(ui,model,state)
         "F13" -> LiveFoodForm(ui, model, state)
         "F14" -> LiveTemplateForm(ui, model, state)
         else -> UiCard { SectionTitle("내 음식부터 준비해볼까요?"); UiButton("내 음식 보기", { ui.go("F06") }) }
@@ -303,6 +297,7 @@ private fun LiveFoodLibrary(ui: PreviewSession, model: MealViewModel, state: Mea
     val adding = state.draft != null
     if (adding) Badge("${state.draft!!.slotLabel}에 음식 추가")
     FoodField("내 음식 검색", query, { query = it }, hint = "음식명 또는 브랜드")
+    UiButton("공공 식품 검색", { model.selectCatalog(null);ui.go("F08") }, primary = false)
     UiButton("새 음식 등록", { openFoodForm(ui, null, "F06") }, primary = false)
     val results = state.foods.filter { query.isBlank() || it.name.contains(query, true) || it.brand.orEmpty().contains(query, true) }
     if (results.isEmpty()) UiCard {
@@ -325,7 +320,7 @@ private fun LiveFoodLibrary(ui: PreviewSession, model: MealViewModel, state: Mea
 private fun LiveFoodDetail(ui: PreviewSession, state: MealUiState) {
     val food = state.foods.firstOrNull { it.id == ui.get("liveFood.foodId") }
     if (food == null) { UiCard { BodyText("이 음식 정보를 찾을 수 없어요."); UiButton("내 음식으로", { ui.go("F06") }) }; return }
-    UiCard { FoodIdentity(food.name, food.brand, food.preparation); Badge("직접 입력"); MutedText("${foodNumber(food.basisGrams)} g 기준") }
+    UiCard { FoodIdentity(food.name, food.brand, food.preparation); Badge(when(food.source){"PUBLIC_DB"->"공공 DB에서 추가";"PUBLIC_EDITED"->"공공 DB · 내가 수정";else->"직접 입력"}); MutedText("${foodNumber(food.basisGrams)} g 기준") }
     LiveNutritionPanel("원본 영양정보", NutritionMath.totals(listOf(food.nutrition)))
     food.sourceNote?.takeIf { it.isNotBlank() }?.let { UiCard { SectionTitle("출처 메모"); BodyText(it) } }
     UiButton("음식 정보 수정", { openFoodForm(ui, food.id, "F06") })
@@ -392,6 +387,65 @@ private fun LiveFoodForm(ui: PreviewSession, model: MealViewModel, state: MealUi
             deleting = false; model.deleteFood(existing) { ui.go("F06") }
         }
     }
+}
+
+@Composable
+private fun LiveCatalog(ui:PreviewSession,model:MealViewModel,state:MealUiState) {
+    val selected=state.catalogSelected
+    if(selected!=null) {
+        var preparation by remember(selected.id,selected.revision) { mutableStateOf("UNKNOWN") }
+        val detailTop = remember { BringIntoViewRequester() }
+        LaunchedEffect(selected.id, selected.revision) { detailTop.bringIntoView() }
+        Box(Modifier.fillMaxWidth().bringIntoViewRequester(detailTop)) {
+            UiButton("검색 결과로",{model.selectCatalog(null)},false)
+        }
+        UiCard {
+            Badge("공공 식품 정보 · ${selected.category}")
+            selected.brand?.let { MutedText("업체 표기 · $it") }
+            SectionTitle(selected.name)
+            Text("영양정보 기준 · ${selected.basisLabel}")
+            listOf("열량" to selected.nutrition.kcal,"탄수화물" to selected.nutrition.carbsG,"단백질" to selected.nutrition.proteinG,"지방" to selected.nutrition.fatG,"식이섬유" to selected.nutrition.fiberG).forEachIndexed { index,(label,value)->
+                KeyValue(label,value?.let { "${it.stripTrailingZeros().toPlainString()} ${if(index==0)"kcal" else "g"}" } ?: "정보 없음")
+            }
+            if(selected.nutrientNotes.orEmpty().isNotEmpty())MutedText("원문에 숫자로 표시되지 않은 값은 정보 없음으로 보관해요.")
+        }
+        UiCard {
+            SectionTitle("원본 출처")
+            Text(selected.sourceName);MutedText("식품 코드 · ${selected.id}")
+            MutedText("자료 기준일 · ${selected.sourceUpdatedAt}")
+            MutedText("공공 DB의 대표값이에요. 내가 먹는 제품과 원재료·조리 상태가 같은지 확인해주세요.")
+        }
+        selected.importBlockReason?.let { UiCard { Text(it) } }
+        if(selected.importBlockReason==null) {
+            UiCard {
+                SectionTitle("내가 확인한 조리 상태")
+                MutedText("원본 이름과 제품 표기를 확인해 선택해요. 확실하지 않으면 모름으로 남겨요.")
+                Chips(preparationLabels.values.toList(),preparationLabels.getValue(preparation)){label->preparation=preparationLabels.entries.first { it.value==label }.key}
+            }
+            UiButton("확인하고 내 음식에 추가",{model.saveCatalog(preparation){ui.go("F06")}},enabled=!state.busy)
+            MutedText("식품함에만 추가해요. 실제 먹은 양은 식사 기록에서 정해주세요.")
+        }
+        UiButton("다른 표기로 직접 등록",{openFoodForm(ui,null,"F06")},false)
+        return
+    }
+    var query by remember { mutableStateOf(state.catalogQuery) }
+    UiCard { SectionTitle("먹은 음식 찾아보기");MutedText("식약처 K-FIND 자료에서 이름이나 업체명으로 찾아요.") }
+    FoodField("공공 식품 검색어",query,{query=it},hint="음식명 또는 업체명 · 예: 밥, 닭가슴살")
+    UiButton("식품 검색",{model.searchCatalog(query)},enabled=!state.catalogLoading&&query.trim().length in 1..80)
+    state.catalogError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+    if(state.catalogLoading)LinearProgressIndicator(Modifier.fillMaxWidth(),color=DeepBlue)
+    state.catalog?.let { result->
+        if(result.items.isEmpty())UiCard { Text(if(!result.available)"공공 식품 목록을 준비하고 있어요. 지금은 직접 등록할 수 있어요." else "일치하는 식품이 없어요. 다른 이름으로 찾거나 직접 등록해주세요.") }
+        result.items.forEach { food->UiCard {
+            food.brand?.let { MutedText("업체 표기 · $it") }
+            SectionTitle(food.name)
+            Text("${food.basisLabel} 기준 · ${food.nutrition.kcal?.stripTrailingZeros()?.toPlainString()?.plus(" kcal") ?: "열량 정보 없음"}")
+            MutedText("${food.category} · ${food.sourceName}")
+            UiButton("이 식품 확인",{model.selectCatalog(food)},false,enabled=!state.catalogLoading)
+        } }
+        if(result.hasMore)UiButton("검색 결과 더 보기",{model.searchCatalog(state.catalogQuery,true)},false,enabled=!state.catalogLoading&&result.page<100)
+    }
+    UiButton("찾는 음식 직접 등록",{openFoodForm(ui,null,"F06")},false)
 }
 
 private data class TemplateLine(val foodId: String, val grams: String)

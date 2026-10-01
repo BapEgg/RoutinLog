@@ -345,6 +345,32 @@ class MealViewModelTest {
     }
 
     private fun d(value: String) = BigDecimal(value)
+    private fun catalogFood()=CatalogFood("TEST-001","테스트 공공식품",null,"음식","80g",d("80"),"g",NutritionValues(kcal=d("160")),"테스트 출처","2026-08-28","https://example.invalid","rev")
+    @Test fun `catalog pagination keeps previous results and saves only confirmed food without recording it`()=runTest(dispatcher) {
+        load();repository.catalogResult=CatalogSearch(listOf(catalogFood()),true,true,0)
+        viewModel.searchCatalog("밥");advanceUntilIdle()
+        repository.catalogResult=CatalogSearch(listOf(catalogFood().copy(id="TEST-002")),false,true,1)
+        viewModel.searchCatalog("밥",true);advanceUntilIdle()
+        assertEquals(2,viewModel.state.value.catalog!!.items.size)
+        viewModel.selectCatalog(catalogFood());repository.foodResult=food().copy(id="public-copy",source="PUBLIC_DB")
+        viewModel.saveCatalog("AS_SOLD"){};viewModel.saveCatalog("AS_SOLD"){};advanceUntilIdle()
+        assertEquals(1,repository.catalogWrites.size);assertTrue(repository.mealWrites.isEmpty())
+        assertEquals("PUBLIC_DB",viewModel.state.value.foods.first { it.id=="public-copy" }.source)
+    }
+    @Test fun `catalog search and selected food clear on logout and late results cannot return`()=runTest(dispatcher) {
+        load();val gate=CompletableDeferred<CatalogSearch>();repository.catalogGate=gate
+        viewModel.searchCatalog("공공식품");runCurrent();viewModel.bind(null)
+        gate.complete(CatalogSearch(listOf(catalogFood()),false,true,0));advanceUntilIdle()
+        assertNull(viewModel.state.value.catalog);assertNull(viewModel.state.value.catalogSelected);assertNull(viewModel.state.value.userId)
+    }
+    @Test fun `unsupported units cannot be saved and failed search can retry without fabricated results`()=runTest(dispatcher) {
+        load();viewModel.selectCatalog(catalogFood().copy(basisUnit="ml"))
+        viewModel.saveCatalog("UNKNOWN"){};advanceUntilIdle();assertTrue(repository.catalogWrites.isEmpty())
+        repository.catalogFailure=true;viewModel.searchCatalog("공공식품");advanceUntilIdle()
+        assertNull(viewModel.state.value.catalog);assertNotNull(viewModel.state.value.catalogError)
+        repository.catalogFailure=false;repository.catalogResult=CatalogSearch(emptyList(),false,true,0)
+        viewModel.searchCatalog("공공식품");advanceUntilIdle();assertNotNull(viewModel.state.value.catalog);assertNull(viewModel.state.value.catalogError)
+    }
     private fun food() = FoodDto("food-a", "테스트 음식", basisGrams = d("100"), nutrition = NutritionValues(kcal = d("100")), preparation = "AS_SOLD", version = 0)
     private fun template() = MealTemplateDto("template-a", "테스트 식사", listOf(TemplateItem("food-a", d("100"))), version = 0)
     private fun meal(id: String = "meal-a", slotId: String = "slot-a", grams: BigDecimal? = d("100"), version: Long = 0, status: String = "EATEN"): MealDto {
@@ -358,6 +384,15 @@ class MealViewModelTest {
 
     /** Fake responses are explicit test fixtures; this class does not impersonate production auth. */
     private inner class FakeMeals : MealDataSource {
+        var catalogResult=CatalogSearch(emptyList(),false,true,0)
+        var catalogGate:CompletableDeferred<CatalogSearch>?=null
+        var catalogFailure=false
+        val catalogWrites=mutableListOf<CatalogSave>()
+        override suspend fun searchCatalog(owner:String,query:String,page:Int):CatalogSearch {
+            if(catalogFailure)error("unavailable")
+            return catalogGate?.await() ?: catalogResult
+        }
+        override suspend fun saveCatalogFood(owner:String,id:String,write:CatalogSave):FoodDto { catalogWrites+=write;return checkNotNull(foodResult) }
         var foods = listOf(food())
         var templates = listOf(template())
         var plan = MealPlanDto(listOf(MealSlot("slot-a", "첫 끼니", "template-a"), MealSlot("slot-b", "다음 끼니", "template-a")), 0)

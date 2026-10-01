@@ -19,6 +19,8 @@ data class MealUiState(
     val foods: List<FoodDto> = emptyList(), val templates: List<MealTemplateDto> = emptyList(),
     val plan: MealPlanDto? = null, val day: MealDayDto? = null, val draft: MealDraft? = null,
     val error: String? = null, val notice: String? = null,
+    val catalog:CatalogSearch?=null,val catalogQuery:String="",val catalogLoading:Boolean=false,
+    val catalogError:String?=null,val catalogSelected:CatalogFood?=null,
 )
 data class MealDraft(val id: String, val date: String, val slotId: String, val slotLabel: String,
     val items: List<MealDraftItem>, val note: String, val version: Long?)
@@ -34,6 +36,8 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     private var zone = ZoneId.systemDefault()
     private var profileRevision: Long? = null
     private var refreshAfterWrite = false
+    private var catalogJob:Job?=null
+    private var catalogEpoch=0L
 
     fun bind(userId: String?, timeZone: String? = null, profileVersion: Long? = null) {
         val nextZone = timeZone?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
@@ -48,6 +52,7 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
         }
         refreshAfterWrite = false
         generation++
+        catalogEpoch++;catalogJob?.cancel()
         readJob?.cancel(); writeJob?.cancel()
         mutableState.value = MealUiState(userId = userId, date = LocalDate.now(zone).toString())
         if (userId != null) refresh()
@@ -166,6 +171,37 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
         mutableState.update { it.copy(foods = it.foods.filterNot { food -> food.id == id } + saved, notice = "음식을 저장했어요.") }
         onSaved()
     }
+    fun searchCatalog(query:String,more:Boolean=false) {
+        val owner=state.value.userId ?: return
+        if(state.value.busy||(more&&state.value.catalogLoading))return
+        val q=query.trim()
+        if(q.length !in 1..80){mutableState.update { it.copy(catalogError="검색어를 1~80자로 입력해주세요.") };return}
+        val previous=state.value.catalog.takeIf { more&&q==state.value.catalogQuery }
+        if(more&&previous?.hasMore!=true)return
+        val page=if(previous==null)0 else previous.page+1
+        catalogJob?.cancel();val epoch=++catalogEpoch
+        mutableState.update { it.copy(catalogLoading=true,catalogQuery=q,catalogError=null,catalogSelected=null,catalog=previous) }
+        catalogJob=viewModelScope.launch {
+            try {
+                val found=repository.searchCatalog(owner,q,page);currentCoroutineContext().ensureActive()
+                if(epoch==catalogEpoch&&state.value.userId==owner)mutableState.update { it.copy(catalog=found.copy(items=(previous?.items.orEmpty()+found.items).distinctBy { item->item.id })) }
+            }catch(e:CancellationException){throw e}
+            catch(e:Exception){if(epoch==catalogEpoch)mutableState.update { it.copy(catalogError=(e as? AccountException)?.userMessage ?: "식품 검색을 완료하지 못했어요. 다시 시도해주세요.") }}
+            finally { if(epoch==catalogEpoch)mutableState.update { it.copy(catalogLoading=false) } }
+        }
+    }
+    fun selectCatalog(food:CatalogFood?) { if(!state.value.busy)mutableState.update { it.copy(catalogSelected=food) } }
+    fun saveCatalog(preparation:String,onSaved:()->Unit) {
+        val selected=state.value.catalogSelected ?: return;val owner=state.value.userId ?: return
+        if(selected.importBlockReason!=null||selected.basisUnit!="g"||selected.basisAmount==null){fail(selected.importBlockReason ?: "g 기준 영양정보를 확인해주세요.");return}
+        if(preparation !in setOf("RAW","COOKED","AS_SOLD","UNKNOWN"))return
+        mutate {
+            val saved=repository.saveCatalogFood(owner,selected.id,CatalogSave(selected.revision,preparation))
+            currentCoroutineContext().ensureActive()
+            mutableState.update { it.copy(foods=it.foods.filterNot { f->f.id==saved.id }+saved,catalogSelected=null,notice="내 음식에 추가했어요. 이미 추가한 식품은 중복 저장하지 않아요.") }
+            onSaved()
+        }
+    }
     fun deleteFood(food: FoodDto, onDeleted: () -> Unit = {}) = mutate {
         repository.deleteFood(food.id, food.version)
         currentCoroutineContext().ensureActive()
@@ -225,7 +261,7 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     }
     private fun showError(error: Exception) = fail((error as? AccountException)?.userMessage ?: "요청을 완료하지 못했어요. 연결을 확인한 뒤 다시 시도해주세요.")
     private fun fail(message: String) = mutableState.update { it.copy(error = message) }
-    private fun FoodDto.snapshot(grams: BigDecimal) = LoggedMealItem(newId(), id, name, brand, basisGrams, nutrition, preparation, sourceNote, grams)
+    private fun FoodDto.snapshot(grams: BigDecimal) = LoggedMealItem(newId(), id, name, brand, basisGrams, nutrition, preparation, sourceNote, grams,source)
     private fun LoggedMealItem.toDraft() = MealDraftItem(id, foodId, grams?.stripTrailingZeros()?.toPlainString().orEmpty(), this)
     private fun validAmount(text: String): BigDecimal? = text.trim().takeIf { it.length <= 20 }?.toBigDecimalOrNull()?.takeIf {
         it.signum() > 0 && it <= BigDecimal("100000") && it.scale() <= 2

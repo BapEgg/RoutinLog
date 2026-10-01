@@ -189,6 +189,8 @@ class AccountRepository internal constructor(
     override suspend fun deleteCondition(date:String,version:Long) { authorized { api.deleteCondition("Bearer ${it.accessToken}",date,version) }.checkStatus() }
 
     override suspend fun listFoods(): List<FoodDto> = authorized { api.listFoods("Bearer ${it.accessToken}") }.required().items
+    override suspend fun searchCatalog(owner:String,query:String,page:Int)=authorized { api.searchCatalog(stepAuth(it,owner),query,page) }.required()
+    override suspend fun saveCatalogFood(owner:String,id:String,write:CatalogSave)=authorized { api.saveCatalogFood(stepAuth(it,owner),id,write) }.required()
 
     override suspend fun saveFood(id: String, food: FoodWrite): FoodDto =
         authorized { api.saveFood("Bearer ${it.accessToken}", id, food) }.required()
@@ -339,7 +341,7 @@ private fun malformed(): Nothing = throw AccountException(AccountErrorKind.SERVE
 private fun <T> Response<T>.required(): T { checkStatus(); return body() ?: malformed() }
 private fun Response<*>.checkStatus() { if (!isSuccessful) throw error() }
 private fun Response<*>.error(): AccountException {
-    val knownCodes = setOf("REVIEW_NOT_FOUND", "REVIEW_STALE", "REVIEW_NO_PLAN", "STEP_CONNECTION_CHANGED", "CONDITION_NOT_FOUND", "PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
+    val knownCodes = setOf("CATALOG_CHANGED", "CATALOG_NOT_FOUND", "REVIEW_NOT_FOUND", "REVIEW_STALE", "REVIEW_NO_PLAN", "STEP_CONNECTION_CHANGED", "CONDITION_NOT_FOUND", "PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
     val serverCode = runCatching {
         errorBody()?.use { body ->
             val reader = body.charStream()
@@ -371,6 +373,7 @@ private fun Response<*>.error(): AccountException {
         AccountErrorKind.VALIDATION -> if (serverCode == "PROFILE_REQUIRED") "내 기본 정보와 건강정보 동의를 완료한 뒤 기록해주세요." else "입력한 값과 필수 항목을 확인해주세요."
         AccountErrorKind.CONFLICT -> when (serverCode) {
             "REVIEW_STALE" -> "기록·계획이나 적용 날짜가 달라졌어요. 새 기록으로 초안을 다시 만들어주세요."
+            "CATALOG_CHANGED" -> "공공 식품 정보가 갱신됐어요. 다시 검색하고 확인해주세요."
             "REVIEW_NO_PLAN" -> "반영할 기본 계획과 목표를 먼저 정해주세요."
             "RESOURCE_IN_USE" -> "다른 계획에서 사용 중이에요. 연결을 해제한 뒤 삭제해주세요."
             "SESSION_EXISTS" -> "이 날짜의 운동 기록이 이미 있어요. 다시 불러온 뒤 이어서 기록해주세요."

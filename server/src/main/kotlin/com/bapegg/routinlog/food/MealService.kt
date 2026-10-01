@@ -22,7 +22,22 @@ import tools.jackson.databind.ObjectMapper
 /** User-row locking serializes reference changes and first-create races, including profile/account edits. */
 @Service
 @Transactional
-class MealService(private val jdbc: JdbcTemplate, private val entities: EntityManager, private val profiles: UserProfileRepository,private val json:ObjectMapper) {
+class MealService(private val jdbc: JdbcTemplate, private val entities: EntityManager, private val profiles: UserProfileRepository,private val json:ObjectMapper,private val catalog:FoodCatalog) {
+    fun requireActiveAccount(userId:UUID) { account(userId) }
+    fun saveCatalogFood(userId:UUID,code:String,request:CatalogSave):FoodDto {
+        account(userId,true)
+        val publicFood=catalog.get(code)
+        if(publicFood.revision!=request.revision)throw MealApiException(HttpStatus.CONFLICT,"CATALOG_CHANGED","공공 식품 정보가 갱신됐어요. 다시 검색하고 확인해주세요.")
+        publicFood.importBlockReason?.let { invalid(it) }
+        val id=UUID.nameUUIDFromBytes("$userId:MFDS:$code:${request.revision}".toByteArray(Charsets.UTF_8))
+        food(userId,id)?.let { return it }
+        val note="식약처 K-FIND · $code · ${publicFood.sourceUpdatedAt} · ${publicFood.sourceName} · ${publicFood.basisLabel} 기준"
+        val n=publicFood.nutrition
+        val normalized=NutritionValues(n.kcal?.stripTrailingZeros(),n.carbsG?.stripTrailingZeros(),n.proteinG?.stripTrailingZeros(),n.fatG?.stripTrailingZeros(),n.fiberG?.stripTrailingZeros())
+        putFood(userId,id,FoodWrite(publicFood.name,publicFood.brand,publicFood.basisAmount!!.stripTrailingZeros(),normalized,request.preparation,note))
+        jdbc.update("UPDATE foods SET source='PUBLIC_DB' WHERE user_id=? AND id=?",userId,id)
+        return food(userId,id)!!
+    }
     fun foods(userId: UUID): FoodListDto {
         account(userId)
         return FoodListDto(jdbc.query("SELECT * FROM foods WHERE user_id=? ORDER BY name,id", foodMapper, userId))
@@ -39,7 +54,7 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
             """INSERT INTO foods(id,user_id,name,brand,basis_grams,kcal,carbs_g,protein_g,fat_g,fiber_g,preparation,source_note)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""", id,userId,name,brand,request.basisGrams,n.kcal,n.carbsG,n.proteinG,n.fatG,n.fiberG,request.preparation.name,sourceNote,
         ) else changed(jdbc.update(
-            """UPDATE foods SET name=?,brand=?,basis_grams=?,kcal=?,carbs_g=?,protein_g=?,fat_g=?,fiber_g=?,preparation=?,source_note=?,version=version+1,updated_at=CURRENT_TIMESTAMP
+            """UPDATE foods SET name=?,brand=?,basis_grams=?,kcal=?,carbs_g=?,protein_g=?,fat_g=?,fiber_g=?,preparation=?,source_note=?,source=CASE WHEN source='USER_ENTERED' THEN source ELSE 'PUBLIC_EDITED' END,version=version+1,updated_at=CURRENT_TIMESTAMP
                 WHERE id=? AND user_id=? AND version=?""", name,brand,request.basisGrams,n.kcal,n.carbsG,n.proteinG,n.fatG,n.fiberG,request.preparation.name,sourceNote,id,userId,old.version,
         ))
         return food(userId,id)!!
@@ -140,7 +155,7 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
             else if(planned[item.id]?.foodId==item.foodId)planned.getValue(item.id).copy(grams=item.grams)
             else {
                 val food=food(userId,uuid(item.foodId)) ?: missing("FOOD_NOT_FOUND")
-                LoggedMealItem(item.id,food.id,food.name,food.brand,food.basisGrams,food.nutrition,food.preparation,food.sourceNote,item.grams)
+                LoggedMealItem(item.id,food.id,food.name,food.brand,food.basisGrams,food.nutrition,food.preparation,food.sourceNote,item.grams,food.source)
             }
         }
         if (old==null) jdbc.update("INSERT INTO meal_records(id,user_id,meal_date,slot_id,slot_label,status,note) VALUES(?,?,?,?,?,?,?)",id,userId,request.date,slotId,slotLabel,request.status.name,note)
@@ -148,8 +163,8 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
         jdbc.update("DELETE FROM meal_record_items WHERE user_id=? AND meal_id=?",userId,id)
         snapshots.forEachIndexed { position,item ->
             val n=item.nutrition
-            jdbc.update("""INSERT INTO meal_record_items(user_id,meal_id,id,position,food_id,name,brand,basis_grams,kcal,carbs_g,protein_g,fat_g,fiber_g,preparation,source_note,grams)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",userId,id,uuid(item.id),position,uuid(item.foodId),item.name,item.brand,item.basisGrams,n.kcal,n.carbsG,n.proteinG,n.fatG,n.fiberG,item.preparation.name,item.sourceNote,item.grams)
+            jdbc.update("""INSERT INTO meal_record_items(user_id,meal_id,id,position,food_id,name,brand,basis_grams,kcal,carbs_g,protein_g,fat_g,fiber_g,preparation,source_note,grams,source)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",userId,id,uuid(item.id),position,uuid(item.foodId),item.name,item.brand,item.basisGrams,n.kcal,n.carbsG,n.proteinG,n.fatG,n.fiberG,item.preparation.name,item.sourceNote,item.grams,item.source)
         }
         return meal(userId,id)!!
     }
@@ -186,7 +201,7 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
     private fun mealMapper(userId: UUID)=RowMapper { rs: ResultSet,_: Int ->
         val id=rs.getObject("id",UUID::class.java)
         val items=jdbc.query("SELECT * FROM meal_record_items WHERE user_id=? AND meal_id=? ORDER BY position",RowMapper { row,_ ->
-            LoggedMealItem(row.getString("id"),row.getString("food_id"),row.getString("name"),row.getString("brand"),row.getBigDecimal("basis_grams"),row.nutrition(),FoodPreparation.valueOf(row.getString("preparation")),row.getString("source_note"),row.getBigDecimal("grams"))
+            LoggedMealItem(row.getString("id"),row.getString("food_id"),row.getString("name"),row.getString("brand"),row.getBigDecimal("basis_grams"),row.nutrition(),FoodPreparation.valueOf(row.getString("preparation")),row.getString("source_note"),row.getBigDecimal("grams"),row.getString("source"))
         },userId,id)
         val status=MealStatus.valueOf(rs.getString("status"))
         MealDto(id.toString(),rs.getObject("meal_date",LocalDate::class.java),rs.getString("slot_id"),rs.getString("slot_label"),status,items,rs.getString("note"),rs.getLong("version"),MealNutrition.totals(if(status==MealStatus.EATEN) items else emptyList()))
@@ -204,7 +219,7 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
     private fun inUse(message: String): Nothing = throw MealApiException(HttpStatus.CONFLICT,"RESOURCE_IN_USE",message)
     private fun conflict(): Nothing = throw MealApiException(HttpStatus.CONFLICT,"VERSION_CONFLICT","기록이 변경됐어요. 최신 내용을 확인한 뒤 다시 시도해주세요.")
     private fun invalid(message: String): Nothing = throw MealApiException(HttpStatus.BAD_REQUEST,"VALIDATION_ERROR",message)
-    private val foodMapper=RowMapper { rs: ResultSet,_: Int -> FoodDto(rs.getString("id"),rs.getString("name"),rs.getString("brand"),rs.getBigDecimal("basis_grams"),rs.nutrition(),FoodPreparation.valueOf(rs.getString("preparation")),rs.getString("source_note"),rs.getLong("version")) }
+    private val foodMapper=RowMapper { rs: ResultSet,_: Int -> FoodDto(rs.getString("id"),rs.getString("name"),rs.getString("brand"),rs.getBigDecimal("basis_grams"),rs.nutrition(),FoodPreparation.valueOf(rs.getString("preparation")),rs.getString("source_note"),rs.getLong("version"),rs.getString("source")) }
     private fun ResultSet.nutrition()=NutritionValues(getBigDecimal("kcal"),getBigDecimal("carbs_g"),getBigDecimal("protein_g"),getBigDecimal("fat_g"),getBigDecimal("fiber_g"))
 }
 

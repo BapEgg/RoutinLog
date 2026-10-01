@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -215,15 +216,40 @@ class LiveFoodFlowTest {
         }
     }
 
+    @Test fun publicFoodSearchRequiresConfirmationAndKeepsUnknownNutrients() {
+        start();compose.runOnIdle { ui.go("F06") }
+        click("공공 식품 검색");enter("공공 식품 검색어","밥");click("식품 검색")
+        compose.waitUntil(5_000){model.state.value.catalog!=null};click("이 식품 확인")
+        compose.onNodeWithText("검색 결과로").assertIsDisplayed()
+        compose.onAllNodesWithText("정보 없음").onFirst().assertExists()
+        compose.runOnIdle { assertTrue(source.foods.isEmpty());assertTrue(source.mealWrites.isEmpty()) }
+        capture("qa-public-food-confirm.png")
+        click("확인하고 내 음식에 추가")
+        compose.waitUntil(5_000){ui.route=="F06"}
+        compose.runOnIdle { assertEquals("PUBLIC_DB",source.foods.values.single().source);assertTrue(source.mealWrites.isEmpty()) }
+    }
+    @Test fun publicVolumeFoodExplainsWhyItCannotBeAddedAsGrams() {
+        start(FakeMeals().apply { catalogVolume=true });compose.runOnIdle { ui.go("F08") }
+        enter("공공 식품 검색어","공공식품");click("식품 검색")
+        compose.waitUntil(5_000){model.state.value.catalog!=null};click("이 식품 확인")
+        compose.onNodeWithText("확인하고 내 음식에 추가").assertDoesNotExist()
+        compose.onNodeWithText("g 기준 영양정보를 직접 등록해주세요.").assertExists()
+        compose.runOnIdle { assertTrue(source.foods.isEmpty()) }
+    }
+
     private fun capture(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         try { FileOutputStream(File(instrumentation.targetContext.cacheDir, name)).use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) } }
         finally { bitmap.recycle() }
     }
 
     private class FakeMeals : MealDataSource {
+        var catalogVolume=false
+        override suspend fun searchCatalog(owner:String,query:String,page:Int)=CatalogSearch(listOf(CatalogFood("TEST-001","테스트 공공식품",null,"음식",if(catalogVolume)"80ml" else "80g",BigDecimal("80"),if(catalogVolume)"ml" else "g",
+            NutritionValues(kcal=BigDecimal("160")),"테스트 출처","2026-08-28","https://example.invalid","rev",if(catalogVolume)"g 기준 영양정보를 직접 등록해주세요." else null)),false,true,0)
+        override suspend fun saveCatalogFood(owner:String,id:String,write:CatalogSave)=FoodDto("copied-public","테스트 공공식품",basisGrams=BigDecimal("80"),nutrition=NutritionValues(kcal=BigDecimal("160")),preparation=write.preparation,version=0,source="PUBLIC_DB").also { foods[it.id]=it }
         val today = LocalDate.now().toString()
         val foods = linkedMapOf<String, FoodDto>()
         val templates = linkedMapOf<String, MealTemplateDto>()

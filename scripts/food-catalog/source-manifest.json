@@ -1,0 +1,21 @@
+{
+  "source": "https://various.foodsafetykorea.go.kr/nutrient/general/down/historyList.do",
+  "files": [
+    {
+      "name": "mfds-dishes.xlsx",
+      "sha256": "1ef3551f9a1d0ee87891d6306fa22bbd6a7ffcc90f2c70a4a184dbfe3fce6ea6"
+    },
+    {
+      "name": "mfds-products.xlsx",
+      "sha256": "b074d98e75d2d087dc1b193f0056affbf9afd14524c9ccb556cb2b20978504f7"
+    }
+  ],
+  "counts": {
+    "accepted": 336351,
+    "unit_ml": 46803,
+    "category_음식": 19617,
+    "unit_g": 289548,
+    "category_가공식품": 316734
+  },
+  "formatVersion": 1
+}
