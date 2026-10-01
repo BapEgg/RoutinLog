@@ -85,6 +85,8 @@ jobs:
           done
           code=$(curl --silent --request DELETE --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/api/v1/me)
           test "$code" = 401
+          code=$(curl --silent --request POST --header 'Content-Type: application/json' --data '{"url":"https://example.com/food"}' --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/api/v1/food-url/preview)
+          test "$code" = 401
 
   android:
     runs-on: ubuntu-24.04

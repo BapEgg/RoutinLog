@@ -28,7 +28,7 @@ val ScreenCatalog = listOf(
     ScreenInfo("F09","영양성분표 촬영","F08","",""),
     ScreenInfo("F10","읽은 내용 확인","F09","",""),
     ScreenInfo("F11","상품 주소로 등록","F08","",""),
-    ScreenInfo("F12","상품 정보를 읽지 못했어요","F11","",""),
+    ScreenInfo("F12","상품 정보 확인","F11","",""),
     ScreenInfo("F13","식품 직접 등록","F08","",""),
     ScreenInfo("F14","저장 식사·레시피 편집","F02","",""),
     ScreenInfo("F15","식사 기록 저장","F03","",""),

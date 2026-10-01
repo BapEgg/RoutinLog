@@ -24,6 +24,7 @@ data class MealUiState(
     val catalogError:String?=null,val catalogSelected:CatalogFood?=null,
     val labelImage: String? = null, val labelDraft: NutritionLabelDraft? = null,
     val labelReading: Boolean = false, val labelError: String? = null,
+    val foodUrl: String = "", val urlReading: Boolean = false, val urlResult: FoodUrlResult? = null, val urlError: String? = null,
 )
 data class MealDraft(val id: String, val date: String, val slotId: String, val slotLabel: String,
     val items: List<MealDraftItem>, val note: String, val version: Long?)
@@ -44,6 +45,32 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     private var labelJob: Job? = null
     private var labelEpoch = 0L
     private var labelCleanup: (() -> Unit)? = null
+    private var urlJob: Job? = null
+    private var urlEpoch = 0L
+
+    fun clearFoodUrl() {
+        urlEpoch++; urlJob?.cancel(); urlJob = null
+        mutableState.update { it.copy(foodUrl = "", urlReading = false, urlResult = null, urlError = null) }
+    }
+    fun previewFoodUrl(url: String) {
+        val owner = state.value.userId ?: return
+        if (state.value.busy || state.value.urlReading) return
+        val value = url.trim()
+        if (value.length !in 1..2048 || !value.startsWith("https://", true)) {
+            mutableState.update { it.copy(urlResult = null, urlError = "https://로 시작하는 상품 주소를 입력해주세요.") }; return
+        }
+        clearFoodUrl(); val epoch = urlEpoch
+        mutableState.update { it.copy(foodUrl = value, urlReading = true) }
+        urlJob = viewModelScope.launch {
+            try {
+                val result = repository.previewFoodUrl(owner, value); currentCoroutineContext().ensureActive()
+                if (epoch == urlEpoch && state.value.userId == owner) mutableState.update { it.copy(urlResult = result) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (epoch == urlEpoch) mutableState.update { it.copy(urlError = (e as? AccountException)?.userMessage ?: "상품 정보를 가져오지 못했어요. 연결을 확인하고 다시 시도해주세요.") }
+            } finally { if (epoch == urlEpoch) mutableState.update { it.copy(urlReading = false) } }
+        }
+    }
 
     fun clearLabel() {
         labelEpoch++; labelJob?.cancel(); labelJob = null
@@ -82,6 +109,7 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
         }
         refreshAfterWrite = false
         generation++
+        clearFoodUrl()
         clearLabel()
         catalogEpoch++;catalogJob?.cancel()
         readJob?.cancel(); writeJob?.cancel()

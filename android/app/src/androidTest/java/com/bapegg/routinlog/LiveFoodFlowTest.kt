@@ -293,6 +293,47 @@ class LiveFoodFlowTest {
         compose.onNodeWithContentDescription("기준량").assertTextContains("")
     }
 
+    @Test fun productUrlRequiresReviewAndSavesOnlyConfirmedPersonalFood() {
+        start(); compose.runOnIdle { ui.go("F06") }
+        click("상품 URL로 등록"); enter("상품 URL", "https://shop.example.com/food")
+        click("상품 정보 가져오기")
+        compose.waitUntil(5_000) { model.state.value.urlResult?.draft != null }
+        click("상품 영양정보 확인")
+        compose.onNodeWithText("shop.example.com").assertExists()
+        capture("qa-food-url-review.png")
+        enter("단백질", "21")
+        compose.onNodeWithContentDescription("기준량").assertTextContains("80")
+        compose.onNodeWithText("내 음식에 저장").assertIsNotEnabled()
+        compose.runOnIdle { assertTrue(source.foods.isEmpty()); assertTrue(source.mealWrites.isEmpty()) }
+        click("원본의 g 기준량과 영양정보를 확인했어요")
+        click("내 음식에 저장")
+        compose.waitUntil(5_000) { ui.route == "F06" }
+        compose.runOnIdle {
+            val food = source.foods.values.single()
+            assertDecimal("80", food.basisGrams); assertDecimal("160", food.nutrition.kcal)
+            assertDecimal("21", food.nutrition.proteinG); assertDecimal("0", food.nutrition.fatG)
+            assertNull(food.nutrition.carbsG); assertNull(food.nutrition.fiberG)
+            assertTrue(food.sourceNote!!.contains("https://shop.example.com/food"))
+            assertTrue(source.mealWrites.isEmpty()); assertNull(model.state.value.urlResult)
+        }
+    }
+
+    @Test fun productUrlFailureOffersManualEntryAndEditingClearsOldResults() {
+        start(); compose.runOnIdle { ui.go("F11") }
+        enter("상품 URL", "https://shop.example.com/food"); click("상품 정보 가져오기")
+        compose.waitUntil(5_000) { model.state.value.urlResult?.draft != null }
+        enter("상품 URL", "https://shop.example.com/private")
+        compose.onNodeWithText("상품 영양정보 확인").assertDoesNotExist()
+        compose.runOnIdle { source.urlResult = FoodUrlResult(reasonCode = "ACCESS_BLOCKED", message = "사이트에서 접근을 허용하지 않았어요. 사진으로 등록하거나 직접 입력해주세요.") }
+        click("상품 정보 가져오기")
+        compose.waitUntil(5_000) { model.state.value.urlResult?.reasonCode != null }
+        compose.onNodeWithText("사이트에서 접근을 허용하지 않았어요. 사진으로 등록하거나 직접 입력해주세요.").performScrollTo().assertIsDisplayed()
+        capture("qa-food-url-fallback.png")
+        click("직접 입력하기")
+        compose.runOnIdle { assertEquals("F13", ui.route); assertNull(model.state.value.urlResult); assertTrue(source.foods.isEmpty()); assertTrue(source.mealWrites.isEmpty()) }
+        compose.onNodeWithContentDescription("기준량").assertTextContains("")
+    }
+
     private fun capture(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -302,6 +343,11 @@ class LiveFoodFlowTest {
     }
 
     private class FakeMeals : MealDataSource {
+        var urlResult = FoodUrlResult(draft = FoodUrlDraft("주소로 등록한 테스트 제품", "테스트 브랜드", BigDecimal("80"),
+            NutritionValues(kcal = BigDecimal("160"), proteinG = BigDecimal("20"), fatG = BigDecimal.ZERO),
+            "https://shop.example.com/food", "shop.example.com", "2026-10-01T01:00:00Z", "80g당 160kcal · 단백질 20g · 지방 0g",
+            listOf("표기되지 않은 영양성분은 정보 없음으로 남겨두세요.")))
+        override suspend fun previewFoodUrl(owner: String, url: String) = urlResult
         var catalogVolume=false
         override suspend fun searchCatalog(owner:String,query:String,page:Int)=CatalogSearch(listOf(CatalogFood("TEST-001","테스트 공공식품",null,"음식",if(catalogVolume)"80ml" else "80g",BigDecimal("80"),if(catalogVolume)"ml" else "g",
             NutritionValues(kcal=BigDecimal("160")),"테스트 출처","2026-08-28","https://example.invalid","rev",if(catalogVolume)"g 기준 영양정보를 직접 등록해주세요." else null)),false,true,0)

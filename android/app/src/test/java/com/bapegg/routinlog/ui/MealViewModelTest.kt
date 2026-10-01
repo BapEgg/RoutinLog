@@ -346,6 +346,29 @@ class MealViewModelTest {
     }
 
     private fun d(value: String) = BigDecimal(value)
+    @Test fun `URL preview has no food writes and can replace a failed result with a new request`() = runTest(dispatcher) {
+        load(); repository.urlResult = FoodUrlResult(reasonCode = "NO_NUTRITION", message = "없음")
+        viewModel.previewFoodUrl("https://example.com/one"); advanceUntilIdle()
+        assertEquals("NO_NUTRITION", viewModel.state.value.urlResult?.reasonCode)
+        repository.urlResult = FoodUrlResult(draft = urlDraft())
+        viewModel.previewFoodUrl("https://example.com/two"); advanceUntilIdle()
+        assertNotNull(viewModel.state.value.urlResult?.draft); assertEquals(1, viewModel.state.value.foods.size)
+        assertTrue(repository.mealWrites.isEmpty()); assertEquals("https://example.com/two", viewModel.state.value.foodUrl)
+    }
+    @Test fun `cancelled or previous-account URL response cannot reappear`() = runTest(dispatcher) {
+        load(); val gate = CompletableDeferred<FoodUrlResult>(); repository.urlGate = gate
+        viewModel.previewFoodUrl("https://example.com/a"); runCurrent(); assertTrue(viewModel.state.value.urlReading)
+        viewModel.bind("account-b"); advanceUntilIdle(); gate.complete(FoodUrlResult(draft = urlDraft())); advanceUntilIdle()
+        assertNull(viewModel.state.value.urlResult); assertEquals("", viewModel.state.value.foodUrl)
+        assertFalse(viewModel.state.value.urlReading)
+    }
+    @Test fun `invalid URL never reaches the server and connection failure is retryable`() = runTest(dispatcher) {
+        load(); viewModel.previewFoodUrl("http://example.com/"); advanceUntilIdle()
+        assertEquals(0, repository.urlCalls); assertNotNull(viewModel.state.value.urlError)
+        repository.urlFailure = true; viewModel.previewFoodUrl("https://example.com/"); advanceUntilIdle()
+        assertFalse(viewModel.state.value.urlReading); assertNull(viewModel.state.value.urlResult); assertNotNull(viewModel.state.value.urlError)
+    }
+    private fun urlDraft() = FoodUrlDraft("URL 테스트", null, d("80"), NutritionValues(kcal=d("160")), "https://example.com/product", "example.com", "2026-10-01T00:00:00Z", "80g당 160kcal", emptyList())
     @Test fun `label read stays unsaved until explicit food confirmation and cleans up on logout`() = runTest(dispatcher) {
         load(); var cleaned = false
         viewModel.readLabel("account-a", "content://test/label", { cleaned = true }) { NutritionLabelParser.parse("80g당 160kcal\n단백질 20g") }
@@ -417,6 +440,11 @@ class MealViewModelTest {
 
     /** Fake responses are explicit test fixtures; this class does not impersonate production auth. */
     private inner class FakeMeals : MealDataSource {
+        var urlResult = FoodUrlResult()
+        var urlGate: CompletableDeferred<FoodUrlResult>? = null
+        var urlCalls = 0
+        var urlFailure = false
+        override suspend fun previewFoodUrl(owner: String, url: String): FoodUrlResult { urlCalls++; if (urlFailure) error("Unavailable"); return urlGate?.await() ?: urlResult }
         var catalogResult=CatalogSearch(emptyList(),false,true,0)
         var catalogGate:CompletableDeferred<CatalogSearch>?=null
         var catalogFailure=false

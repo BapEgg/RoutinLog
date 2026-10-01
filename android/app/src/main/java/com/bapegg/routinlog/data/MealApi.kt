@@ -4,6 +4,7 @@ import retrofit2.Response
 import retrofit2.http.*
 
 internal interface MealApi {
+    @POST("api/v1/food-url/preview") suspend fun previewFoodUrl(@Header("Authorization") auth:String, @Body request:FoodUrlRequest):Response<FoodUrlResult>
     @GET("api/v1/food-catalog") suspend fun searchCatalog(@Header("Authorization") auth:String,@Query("q") query:String,@Query("page") page:Int):Response<CatalogSearch>
     @POST("api/v1/food-catalog/{id}/save") suspend fun saveCatalogFood(@Header("Authorization") auth:String,@Path("id") id:String,@Body write:CatalogSave):Response<FoodDto>
     @GET("api/v1/foods") suspend fun listFoods(@Header("Authorization") auth: String): Response<FoodListDto>

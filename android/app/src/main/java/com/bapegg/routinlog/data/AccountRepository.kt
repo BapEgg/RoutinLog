@@ -189,6 +189,7 @@ class AccountRepository internal constructor(
     override suspend fun deleteCondition(date:String,version:Long) { authorized { api.deleteCondition("Bearer ${it.accessToken}",date,version) }.checkStatus() }
 
     override suspend fun listFoods(): List<FoodDto> = authorized { api.listFoods("Bearer ${it.accessToken}") }.required().items
+    override suspend fun previewFoodUrl(owner:String,url:String)=authorized { api.previewFoodUrl(stepAuth(it,owner),FoodUrlRequest(url)) }.required()
     override suspend fun searchCatalog(owner:String,query:String,page:Int)=authorized { api.searchCatalog(stepAuth(it,owner),query,page) }.required()
     override suspend fun saveCatalogFood(owner:String,id:String,write:CatalogSave)=authorized { api.saveCatalogFood(stepAuth(it,owner),id,write) }.required()
 

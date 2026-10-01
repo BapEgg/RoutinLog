@@ -179,6 +179,18 @@ class MealRepositoryTest {
         assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
     }
     private fun body(request: RecordedRequest) = JsonParser.parseString(request.body.readUtf8()).asJsonObject
+    @Test fun `URL preview sends only the URL in an authenticated body and keeps an explicit failure`() = runBlocking {
+        server.enqueue(json("""{"draft":null,"reasonCode":"ACCESS_BLOCKED","message":"판매처에서 접근을 제한했어요."}"""))
+        val result = repository.previewFoodUrl("fake-user", "https://example.com/product?id=1")
+        val request = take()
+        assertEquals("POST", request.method); assertEquals("/api/v1/food-url/preview", request.path)
+        assertEquals("Bearer fake-access-1", request.getHeader("Authorization"))
+        assertEquals(setOf("url"), body(request).keySet()); assertNull(result.draft); assertEquals("ACCESS_BLOCKED", result.reasonCode)
+    }
+    @Test fun `URL preview cannot use an old account session`() = runBlocking {
+        assertEquals(AccountErrorKind.CANCELLED, failure { repository.previewFoodUrl("another-user", "https://example.com/product") }.kind)
+        assertNull(server.takeRequest(100, TimeUnit.MILLISECONDS))
+    }
     private fun json(value: String, code: Int = 200) = MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(value)
     private fun tokens(suffix: String) = """{"accessToken":"fake-access-$suffix","refreshToken":"fake-refresh-$suffix","expiresIn":3600,"userId":"fake-user"}"""
     private suspend fun failure(block: suspend () -> Any?): AccountException {

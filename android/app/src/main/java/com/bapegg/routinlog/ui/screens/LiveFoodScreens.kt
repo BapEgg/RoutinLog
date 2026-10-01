@@ -56,6 +56,11 @@ internal fun LiveFoodScreens(id: String, ui: PreviewSession, model: MealViewMode
             BodyText("영양성분표 사진을 다시 선택해주세요.")
             UiButton("사진 선택하기", { ui.go("F09") })
         }
+        "F11" -> LiveFoodUrlInput(ui, model, state)
+        "F12" -> if (state.urlResult?.draft != null) LiveFoodForm(ui, model, state, fromUrl = true) else UiCard {
+            BodyText("상품 주소를 다시 확인해주세요.")
+            UiButton("상품 주소로 돌아가기", { ui.go("F11") })
+        }
         "F13" -> LiveFoodForm(ui, model, state)
         "F14" -> LiveTemplateForm(ui, model, state)
         else -> UiCard { SectionTitle("내 음식부터 준비해볼까요?"); UiButton("내 음식 보기", { ui.go("F06") }) }
@@ -305,6 +310,7 @@ private fun LiveFoodLibrary(ui: PreviewSession, model: MealViewModel, state: Mea
     FoodField("내 음식 검색", query, { query = it }, hint = "음식명 또는 브랜드")
     UiButton("공공 식품 검색", { model.selectCatalog(null);ui.go("F08") }, primary = false)
     UiButton("영양성분표 사진으로 등록", { model.clearLabel(); ui.go("F09") }, primary = false)
+    UiButton("상품 URL로 등록", { model.clearFoodUrl(); ui.go("F11") }, primary = false)
     UiButton("새 음식 등록", { openFoodForm(ui, null, "F06") }, primary = false)
     val results = state.foods.filter { query.isBlank() || it.name.contains(query, true) || it.brand.orEmpty().contains(query, true) }
     if (results.isEmpty()) UiCard {
@@ -334,28 +340,32 @@ private fun LiveFoodDetail(ui: PreviewSession, state: MealUiState) {
 }
 
 @Composable
-private fun LiveFoodForm(ui: PreviewSession, model: MealViewModel, state: MealUiState, fromLabel: Boolean = false) {
-    val selectedId = if (fromLabel) "" else ui.get("liveFood.foodId")
+private fun LiveFoodForm(ui: PreviewSession, model: MealViewModel, state: MealUiState, fromLabel: Boolean = false, fromUrl: Boolean = false) {
+    val selectedId = if (fromLabel || fromUrl) "" else ui.get("liveFood.foodId")
     val label = state.labelDraft.takeIf { fromLabel }
+    val url = state.urlResult?.draft.takeIf { fromUrl }
+    val imported = fromLabel || fromUrl
+    val startingNutrition = label?.nutrition ?: url?.nutrition
     val existing = state.foods.firstOrNull { it.id == selectedId }
     if (selectedId.isNotBlank() && existing == null) { UiCard { BodyText("수정할 음식을 찾을 수 없어요."); UiButton("내 음식으로", { ui.go("F06") }) }; return }
-    val id = rememberSaveable(selectedId, label) { selectedId.ifBlank { UUID.randomUUID().toString() } }
+    val id = rememberSaveable(selectedId, label, url) { selectedId.ifBlank { UUID.randomUUID().toString() } }
     val version = remember(id) { existing?.version }
-    var name by rememberSaveable(id) { mutableStateOf(existing?.name.orEmpty()) }
-    var brand by rememberSaveable(id) { mutableStateOf(existing?.brand.orEmpty()) }
-    var basis by rememberSaveable(id) { mutableStateOf((existing?.basisGrams ?: label?.basisGrams)?.let(::foodNumber).orEmpty()) }
+    var name by rememberSaveable(id) { mutableStateOf(existing?.name ?: url?.name.orEmpty()) }
+    var brand by rememberSaveable(id) { mutableStateOf(existing?.brand ?: url?.brand.orEmpty()) }
+    var basis by rememberSaveable(id) { mutableStateOf((existing?.basisGrams ?: label?.basisGrams ?: url?.basisGrams)?.let(::foodNumber).orEmpty()) }
     var preparation by rememberSaveable(id) { mutableStateOf(existing?.preparation ?: "UNKNOWN") }
-    var kcal by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.kcal ?: label?.nutrition?.kcal)?.let(::foodNumber).orEmpty()) }
-    var carbs by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.carbsG ?: label?.nutrition?.carbsG)?.let(::foodNumber).orEmpty()) }
-    var protein by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.proteinG ?: label?.nutrition?.proteinG)?.let(::foodNumber).orEmpty()) }
-    var fat by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.fatG ?: label?.nutrition?.fatG)?.let(::foodNumber).orEmpty()) }
-    var fiber by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.fiberG ?: label?.nutrition?.fiberG)?.let(::foodNumber).orEmpty()) }
-    var source by rememberSaveable(id) { mutableStateOf(existing?.sourceNote ?: if (fromLabel) "영양성분표 사진 · 자동 인식 후 직접 확인" else "") }
+    var kcal by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.kcal ?: startingNutrition?.kcal)?.let(::foodNumber).orEmpty()) }
+    var carbs by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.carbsG ?: startingNutrition?.carbsG)?.let(::foodNumber).orEmpty()) }
+    var protein by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.proteinG ?: startingNutrition?.proteinG)?.let(::foodNumber).orEmpty()) }
+    var fat by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.fatG ?: startingNutrition?.fatG)?.let(::foodNumber).orEmpty()) }
+    var fiber by rememberSaveable(id) { mutableStateOf((existing?.nutrition?.fiberG ?: startingNutrition?.fiberG)?.let(::foodNumber).orEmpty()) }
+    var source by rememberSaveable(id) { mutableStateOf(existing?.sourceNote ?: if (fromLabel) "영양성분표 사진 · 자동 인식 후 직접 확인" else if (url != null) "상품 페이지 · 직접 확인 · ${url.checkedAt.take(10)} · ${url.sourceUrl.takeIf { it.length <= 400 } ?: url.sourceHost}" else "") }
     var labelConfirmed by rememberSaveable(id) { mutableStateOf(false) }
     var error by remember(id) { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf(false) }
     if (fromLabel) LabelReviewSource(state)
-    Badge(if (fromLabel) "새 음식 · 사진 확인" else if (existing == null) "새 음식 · 직접 입력" else "내 음식 수정")
+    if (url != null) FoodUrlReviewSource(url)
+    Badge(if (fromLabel) "새 음식 · 사진 확인" else if (fromUrl) "새 음식 · 상품 정보 확인" else if (existing == null) "새 음식 · 직접 입력" else "내 음식 수정")
     FoodField("브랜드 · 선택", brand, { brand = it })
     FoodField("음식 이름", name, { name = it })
     UiCard {
@@ -373,13 +383,13 @@ private fun LiveFoodForm(ui: PreviewSession, model: MealViewModel, state: MealUi
         FoodField("식이섬유 · 선택", fiber, { fiber = it }, "g", numeric = true)
     }
     FoodField("출처 메모 · 선택", source, { source = it }, multiline = true, hint = "예: 제품 뒷면 영양성분표")
-    if (fromLabel) Choice("원본의 g 기준량과 영양정보를 확인했어요", "숫자와 단위를 비교하고, 없는 성분은 빈칸으로 남겼어요.", labelConfirmed) { labelConfirmed = !labelConfirmed }
+    if (imported) Choice("원본의 g 기준량과 영양정보를 확인했어요", "숫자와 단위를 비교하고, 없는 성분은 빈칸으로 남겼어요.", labelConfirmed) { labelConfirmed = !labelConfirmed }
     FoodError(error)
     UiButton(if (existing == null) "내 음식에 저장" else "음식 정보 변경 저장", {
         val base = positiveAmount(basis)
         val values = listOf(kcal, carbs, protein, fat, fiber)
         error = when {
-            fromLabel && !labelConfirmed -> "원본 사진의 기준량과 영양정보를 확인해주세요."
+            imported && !labelConfirmed -> "원본의 기준량과 영양정보를 확인해주세요."
             !validText(name.trim(), 80) -> "음식 이름을 1~80자로 입력해주세요."
             !validOptionalText(brand, 80) -> "브랜드는 80자 이내로 입력해주세요."
             base == null -> "기준량은 0보다 크고 100,000g 이하인 수로, 소수점 두 자리까지 입력해주세요."
@@ -389,8 +399,8 @@ private fun LiveFoodForm(ui: PreviewSession, model: MealViewModel, state: MealUi
         }
         if (error == null && base != null) model.saveFood(id, FoodWrite(name.trim(), brand.trim().ifBlank { null }, base,
             NutritionValues(nutritionAmount(kcal), nutritionAmount(carbs), nutritionAmount(protein), nutritionAmount(fat), nutritionAmount(fiber)),
-            preparation, source.trim().ifBlank { null }, version)) { if (fromLabel) model.clearLabel(); ui.go(ui.get("liveFood.foodReturn", "F06")) }
-    }, enabled = !fromLabel || labelConfirmed)
+            preparation, source.trim().ifBlank { null }, version)) { if (fromLabel) model.clearLabel(); if (fromUrl) model.clearFoodUrl(); ui.go(ui.get("liveFood.foodReturn", "F06")) }
+    }, enabled = !imported || labelConfirmed)
     MutedText("원래 기준량을 보관하고, 실제 먹은 g에 맞춰 계산해요.")
     if (existing != null) {
         MutedText("정보를 바꿔도 이미 기록한 식사의 영양정보는 바뀌지 않아요.")

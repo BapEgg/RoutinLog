@@ -15,7 +15,14 @@ import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/v1")
-class MealController(private val meals: MealService,private val catalog:FoodCatalog) {
+class MealController(private val meals: MealService,private val catalog:FoodCatalog,private val foodUrls:FoodUrlPreview) {
+    @PostMapping("/food-url/preview")
+    fun foodUrl(@AuthenticationPrincipal user:AuthenticatedUser,@RequestBody request:FoodUrlRequest):ResponseEntity<FoodUrlResult> {
+        meals.requireActiveAccount(user.userId)
+        val result=foodUrls.preview(user.userId,request.url)
+        meals.requireActiveAccount(user.userId)
+        return privateResponse(result)
+    }
     @GetMapping("/food-catalog")
     fun catalog(@AuthenticationPrincipal user:AuthenticatedUser,@RequestParam q:String,@RequestParam(defaultValue="0") page:Int):ResponseEntity<CatalogSearch> {
         meals.requireActiveAccount(user.userId);return privateResponse(catalog.search(q,page))
