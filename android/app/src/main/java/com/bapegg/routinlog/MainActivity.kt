@@ -11,6 +11,8 @@ import com.bapegg.routinlog.data.SystemStatusRepository
 import com.bapegg.routinlog.ui.RoutineLogApp
 import com.bapegg.routinlog.ui.RoutineLogViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.StepsViewModel
+import com.bapegg.routinlog.steps.RoutineLogServices
 import com.bapegg.routinlog.ui.ConditionViewModel
 import com.bapegg.routinlog.ui.WorkoutViewModel
 import com.bapegg.routinlog.ui.AccountViewModel
@@ -21,8 +23,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val repository = AccountRepository.create(applicationContext, BuildConfig.API_BASE_URL,
-            BuildConfig.DEBUG, BuildConfig.GOOGLE_WEB_CLIENT_ID)
+        val services = RoutineLogServices.get(applicationContext)
+        val repository = services.accounts
         val factory = viewModelFactory {
             initializer {
                 RoutineLogViewModel(SystemStatusRepository.create(BuildConfig.API_BASE_URL, BuildConfig.DEBUG))
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
                 AccountViewModel(repository)
             }
         }
+        val stepsFactory = viewModelFactory { initializer { StepsViewModel(repository,services.steps) } }
         val mealFactory = viewModelFactory { initializer { MealViewModel(repository) } }
         val conditionFactory = viewModelFactory { initializer { ConditionViewModel(repository) } }
         val workoutFactory = viewModelFactory { initializer { WorkoutViewModel(repository) } }
@@ -41,7 +44,8 @@ class MainActivity : ComponentActivity() {
                 val meals: MealViewModel = viewModel(factory = mealFactory)
                 val workouts: WorkoutViewModel = viewModel(factory = workoutFactory)
                 val conditions: ConditionViewModel = viewModel(factory = conditionFactory)
-                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions)
+                val steps: StepsViewModel = viewModel(factory = stepsFactory)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps)
             }
         }
     }

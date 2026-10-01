@@ -33,6 +33,9 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
                     .requestMatchers(HttpMethod.GET, "/api/v1/conditions").access(::accountAccess)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/conditions/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/conditions/*").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/step-connection", "/api/v1/steps").access(::accountAccess)
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/step-connection", "/api/v1/step-connections/*/days").access(::accountAccess)
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/step-connections/*").access(::accountAccess)
                     .anyRequest().denyAll()
             }
             .formLogin { it.disable() }

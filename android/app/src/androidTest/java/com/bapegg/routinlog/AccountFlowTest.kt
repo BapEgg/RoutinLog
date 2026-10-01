@@ -14,6 +14,9 @@ import com.bapegg.routinlog.domain.NutritionMath
 import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.StepsViewModel
+import com.bapegg.routinlog.steps.*
+import java.time.Instant
 import com.bapegg.routinlog.ui.ConditionViewModel
 import com.bapegg.routinlog.ui.WorkoutViewModel
 import com.bapegg.routinlog.ui.PreviewSession
@@ -41,10 +44,11 @@ class AccountFlowTest {
     private var meals: MealViewModel? = null
     private var workouts: WorkoutViewModel? = null
     private var conditions: ConditionViewModel? = null
+    private var steps: StepsViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
@@ -54,15 +58,18 @@ class AccountFlowTest {
                 initializer { MealViewModel(requireNotNull(mealFake)) }
                 initializer { WorkoutViewModel(requireNotNull(workoutFake)) }
                 initializer { ConditionViewModel(requireNotNull(conditionFake)) }
+                initializer { StepsViewModel(requireNotNull(stepFake),stepFake.engine { source.identity.value?.userId }) }
             }
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
             meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
+            steps = if(stepFake==null)null else ViewModelProvider(compose.activity,factory)[StepsViewModel::class.java]
             conditions = if (conditionFake == null) null else ViewModelProvider(compose.activity, factory)[ConditionViewModel::class.java]
             workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
+        if(stepFake!=null)compose.waitUntil(5_000){steps?.state?.value?.let { it.loaded&&!it.busy }==true}
         if (conditionFake != null) compose.waitUntil(5_000) { conditions?.state?.value?.let { it.loaded && !it.loading } == true }
         if (mealFake != null) compose.waitUntil(5_000) { meals?.state?.value?.let { it.loaded && !it.loading } == true }
         if (workoutFake != null) compose.waitUntil(5_000) { workouts?.state?.value?.let { it.loaded && !it.loading } == true }
@@ -533,6 +540,58 @@ class AccountFlowTest {
             return ConditionDto(date,write.values,(write.version ?: -1)+1).also { records[date]=it }
         }
         override suspend fun deleteCondition(date:String,version:Long) { check(records[date]?.version == version);records.remove(date) }
+    }
+
+    @Test fun phoneStepsOptInSyncDisconnectAndAccountExpiry() {
+        val fixture=StepFixture()
+        start(stepFake=fixture)
+        compose.onNodeWithText("걸음 기록").performScrollTo().performClick()
+        compose.onNodeWithText("아직 가져온 걸음 기록이 없어요.").assertExists()
+        compose.onNodeWithText("이 휴대폰 걸음 연결").performScrollTo().performClick()
+        compose.onNodeWithText("허용하고 연결").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("이 휴대폰 연결됨").performScrollTo().assertExists()
+        compose.onNodeWithText("3,200",useUnmergedTree=true).assertExists()
+        compose.runOnIdle { assertEquals(1,fixture.starts);assertTrue(requireNotNull(steps).state.value.connected) }
+        capture("qa-live-steps.png")
+        compose.onNodeWithText("지금 새로고침").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(3200L,requireNotNull(steps).state.value.days.first { it.date==source.today }.steps) }
+        compose.onNodeWithText("걸음 연결 해제").performScrollTo().performClick()
+        compose.onNodeWithText("해제",useUnmergedTree=true).performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertFalse(requireNotNull(steps).state.value.connected);assertTrue(fixture.records.isNotEmpty());source.expireFromAnotherFeature() }
+        compose.waitForIdle()
+        compose.onNodeWithText("로그인 없이 둘러보기").assertExists()
+        compose.runOnIdle { assertNull(steps?.state?.value?.owner);assertTrue(requireNotNull(steps).state.value.days.isEmpty()) }
+    }
+    @Test fun unsupportedPhoneShowsMissingInsteadOfInventedStepCounts() {
+        val fixture=StepFixture().apply { supported=false }
+        start(stepFake=fixture)
+        compose.onNodeWithText("걸음 기록").performScrollTo().performClick()
+        compose.onNodeWithText("아직 가져온 걸음 기록이 없어요.").assertExists()
+        compose.onNodeWithText("이 휴대폰 걸음 연결").assertDoesNotExist()
+        compose.onNodeWithText("이 기기에서는 걸음 센서를 사용할 수 없어요. 식단과 운동은 계속 기록할 수 있어요.").assertExists()
+        compose.runOnIdle { assertEquals(0,fixture.starts);assertNull(fixture.binding) }
+    }
+    private class StepFixture:StepDataSource,PhoneSteps,StepBindingStore {
+        var supported=true;var starts=0;var binding:StepBinding?=null;var active:StepConnection?=null
+        val records=linkedMapOf<String,StepDay>()
+        fun engine(identity:()->String?)=StepEngine(this,this,this,object:StepSchedule {override fun start(){};override fun cancel(){}},identity)
+        override fun availability()=if(supported)StepAvailability.READY else StepAvailability.UNSUPPORTED
+        override suspend fun start(){starts++}
+        override suspend fun stop(){}
+        override suspend fun read(from:Instant,through:Instant):Long=3200
+        override fun read()=binding
+        override fun write(binding:StepBinding?){this.binding=binding}
+        override suspend fun stepConnection(owner:String)=StepConnectionState(active,Instant.now().toString())
+        override suspend fun connectSteps(owner:String,id:String):StepConnectionState {
+            active=StepConnection(id,LocalDate.now().minusDays(3).atStartOfDay(ZoneId.systemDefault()).toInstant().toString(),ZoneId.systemDefault().id)
+            return stepConnection(owner)
+        }
+        override suspend fun disconnectSteps(owner:String,id:String){active=null}
+        override suspend fun saveSteps(owner:String,id:String,batch:StepBatch){batch.items.forEach { records[it.date]=StepDay(it.date,it.steps,it.from,it.through,listOf(ZoneId.systemDefault().id),1) }}
+        override suspend fun listSteps(owner:String,from:String,to:String)=records.values.filter { it.date in from..to }.sortedByDescending { it.date }
     }
 
     private fun assertAccountStillLoaded() {

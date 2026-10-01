@@ -3,7 +3,7 @@ package com.bapegg.routinlog.data
 import retrofit2.Response
 import retrofit2.http.*
 
-internal interface AccountApi : MealApi, WorkoutApi, ConditionApi {
+internal interface AccountApi : MealApi, WorkoutApi, ConditionApi, StepsApi {
     @POST("api/v1/auth/google/challenge") suspend fun challenge(): Response<GoogleChallengeDto>
     @POST("api/v1/auth/google") suspend fun login(@Body body: GoogleLoginDto): Response<AuthTokensDto>
     @POST("api/v1/auth/refresh") suspend fun refresh(@Body body: RefreshRequestDto): Response<AuthTokensDto>

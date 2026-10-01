@@ -1,5 +1,9 @@
 package com.bapegg.routinlog.ui
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -38,9 +42,23 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
+    val stepsState=stepsModel?.state?.collectAsStateWithLifecycle()?.value
+    LaunchedEffect(accountState.userId,accountState.initializing,accountState.busy,accountState.profile?.timeZone) {
+        if(!accountState.initializing&&!accountState.busy)stepsModel?.bind(accountState.userId.takeIf { accountState.ready&&accountState.profile!=null },accountState.profile?.timeZone)
+    }
+    LaunchedEffect(ui.get("home.date"),stepsState?.busy,stepsState?.owner) {
+        if(ui.accountMode&&stepsState?.busy==false)stepsModel?.selectDate(ui.get("home.date",ui.today().toString()))
+    }
+    val lifecycleOwner=LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner,stepsModel) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            delay(1000)
+            while(true){stepsModel?.refresh();delay(60_000)}
+        }
+    }
     val conditionState = conditionModel?.state?.collectAsStateWithLifecycle()?.value
     LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
         conditionModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile!=null },accountState.profile?.timeZone)
@@ -117,7 +135,7 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalAccount provides actions,LocalConditions provides conditionModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
+    CompositionLocalProvider(LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -180,6 +198,7 @@ import java.math.RoundingMode
 @Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?,workoutModel:WorkoutViewModel?){
     // The outgoing animated screen must never switch to sample data after sign-out.
     if(!ui.accountMode && !ui.previewMode && id!="A01")return
+    if(ui.accountMode && id in setOf("H06","S03")) { LocalSteps.current?.let { LiveStepsScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id=="H07") { LocalConditions.current?.let { LiveConditionScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F13","F14") && mealModel!=null) {
         LiveFoodScreens(id,ui,mealModel);return

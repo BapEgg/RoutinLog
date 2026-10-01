@@ -39,6 +39,8 @@ import java.util.Locale
     UiCard {
         UiRow("운동 기록", "요일별 루틴과 실제 수행한 세트를 함께 남겨요", icon="Dumbbell", onClick={ui.go("W01")})
     }
+    val steps=LocalSteps.current?.state?.collectAsStateWithLifecycle()?.value
+    UiCard { UiRow("걸음 기록",steps?.days?.firstOrNull { it.date==date.toString() }?.let { "%,d걸음 · 저장된 기록".format(it.steps) } ?: "휴대폰 걸음을 내 루틴과 함께 남겨요",icon="Footprints",onClick={ui.go("H06")}) }
     val conditions=LocalConditions.current?.state?.collectAsStateWithLifecycle()?.value
     UiCard { UiRow(if(date==ui.today())"오늘의 컨디션"else"이날의 컨디션",
         conditions?.records?.firstOrNull { it.date==date.toString() }?.let { conditionSummary(it.values) } ?: "수면·피로·근육통·생활 활동을 남겨요",icon="HeartPulse",onClick={ui.go("H07")}) }
@@ -112,6 +114,7 @@ import java.util.Locale
     }
     if(!accountPage)UiCard {
         UiRow("프로필 · 목표 · 단위", "저장한 기준 확인과 수정",icon="UserRound",onClick={ui.go("S02")})
+        UiRow("걸음수 · 권한 관리", "이 휴대폰의 걸음 연결",icon="Footprints",onClick={ui.go("S03")})
         UiRow("데이터 · 계정", "계정 연결 관리",icon="ShieldCheck",onClick={ui.go("S04")})
     }
     else UiCard {
@@ -129,7 +132,7 @@ import java.util.Locale
     val account=LocalAccount.current
     UiCard {
         SectionTitle("계정과 기록을 삭제할까요?")
-        BodyText("프로필·목표 변경 이력·체중·허리둘레·컨디션·수면·메모, 등록 음식·저장 식사·기본 식단·섭취 기록, 등록 운동·루틴·요일 계획과 변경 이력·세트 기록을 모두 삭제해요. 모든 기기의 로그인 연결도 해제해요.")
+        BodyText("프로필·목표 변경 이력·체중·허리둘레·컨디션·수면·메모·걸음 기록과 연결 정보, 등록 음식·저장 식사·기본 식단·섭취 기록, 등록 운동·루틴·요일 계획과 변경 이력·세트 기록을 모두 삭제해요. 모든 기기의 로그인 연결도 해제해요.")
         MutedText("Google 계정 자체는 삭제하지 않아요. 삭제 후에는 기록을 되돌릴 수 없어요.")
         MutedText("먼저 Google에서 현재 계정의 본인 확인을 진행해요. 다른 계정을 선택하면 삭제되지 않아요.")
     }

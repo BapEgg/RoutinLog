@@ -91,7 +91,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
         "A08" -> {
             if(ui.accountMode){
                 UiButton("시작 설정 저장하고 기록하기",account.saveProfile)
-                MutedText("걸음수 연결은 추후 제공돼요.")
+                MutedText("저장 후 홈의 ‘걸음 기록’에서 선택해서 연결할 수 있어요.")
             }else{
                 UiButton("걸음수 연동하기", { ui.notify("걸음 연동은 아직 연결되지 않았어요. 지금은 샘플 화면으로 둘러볼 수 있어요.") })
                 UiButton("나중에 할게요", { ui.go("H02") }, primary = false)
@@ -355,7 +355,7 @@ fun HomeFooter(id: String, ui: PreviewSession) {
     MutedText("휴대폰에 모인 걸음을 가져와\n내 루틴과 함께 살펴봐요.")
     UiCard {
         SectionTitle("주간 걸음의 변화")
-        BarChart(listOf(4800f, 6800f, 5400f, 7800f, 6200f, 9000f, 5600f), weekDays)
+        if(!ui.accountMode)BarChart(listOf(4800f, 6800f, 5400f, 7800f, 6200f, 9000f, 5600f), weekDays)
         MutedText("연동하면 내 걸음 기록이 이곳에 표시돼요.")
     }
     UiCard {
