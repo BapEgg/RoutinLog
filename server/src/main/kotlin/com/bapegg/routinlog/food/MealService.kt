@@ -17,11 +17,12 @@ import java.sql.ResultSet
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
+import tools.jackson.databind.ObjectMapper
 
 /** User-row locking serializes reference changes and first-create races, including profile/account edits. */
 @Service
 @Transactional
-class MealService(private val jdbc: JdbcTemplate, private val entities: EntityManager, private val profiles: UserProfileRepository) {
+class MealService(private val jdbc: JdbcTemplate, private val entities: EntityManager, private val profiles: UserProfileRepository,private val json:ObjectMapper) {
     fun foods(userId: UUID): FoodListDto {
         account(userId)
         return FoodListDto(jdbc.query("SELECT * FROM foods WHERE user_id=? ORDER BY name,id", foodMapper, userId))
@@ -96,13 +97,30 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
     }
 
     fun day(userId: UUID,date: LocalDate): MealDayDto {
-        val user=account(userId); date(user,date)
+        val user=account(userId); date(user,date,14)
         val meals=jdbc.query("SELECT * FROM meal_records WHERE user_id=? AND meal_date=? ORDER BY created_at,id",mealMapper(userId),userId,date)
         val target=profiles.findFirstByUserIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDescRevisionDesc(userId,date)?.let {
             if (it.nutritionMode == NutritionMode.NONE) null else NutritionValues(it.dailyCalories?.toBigDecimal(),it.carbohydrateG,it.proteinG,it.fatG,it.fiberG)
         }
         // Sum the unrounded source items across meals, never rounded meal totals.
-        return MealDayDto(date,meals,MealNutrition.totals(meals.filter { it.status==MealStatus.EATEN }.flatMap { it.items }),target)
+        val planned=jdbc.query("SELECT payload FROM meal_day_plans WHERE user_id=? AND meal_date=? ORDER BY slot_id",RowMapper { rs,_->json.readValue(rs.getString("payload"),PlannedMeal::class.java) },userId,date)
+        return MealDayDto(date,meals,MealNutrition.totals(meals.filter { it.status==MealStatus.EATEN }.flatMap { it.items }),target,planned)
+    }
+
+    internal fun applyReview(userId:UUID,date:LocalDate,meal:PlannedMeal) {
+        val user=account(userId,true);date(user,date,14)
+        if(date<LocalDate.now(ZoneId.of(user.timeZone))||count("SELECT COUNT(*) FROM meal_records WHERE user_id=? AND meal_date=? AND slot_id=?",userId,date,uuid(meal.slotId))>0||
+            count("SELECT COUNT(*) FROM meal_day_plans WHERE user_id=? AND meal_date=? AND slot_id=?",userId,date,uuid(meal.slotId))>0)
+            throw MealApiException(HttpStatus.CONFLICT,"REVIEW_STALE","이미 계획이나 기록이 있는 끼니예요. 초안을 다시 확인해주세요.")
+        jdbc.update("INSERT INTO meal_day_plans(user_id,meal_date,slot_id,payload) VALUES(?,?,?,?)",userId,date,uuid(meal.slotId),json.writeValueAsString(meal))
+    }
+    fun deleteDayPlan(userId:UUID,date:LocalDate,slotId:UUID,expectedVersion:Long) {
+        val user=account(userId,true);date(user,date,14)
+        val old=day(userId,date).plannedMeals.firstOrNull { it.slotId==slotId.toString() } ?: return
+        version(old.version,expectedVersion)
+        if(date<LocalDate.now(ZoneId.of(user.timeZone))||count("SELECT COUNT(*) FROM meal_records WHERE user_id=? AND meal_date=? AND slot_id=?",userId,date,slotId)>0)
+            throw MealApiException(HttpStatus.CONFLICT,"REVIEW_STALE","이미 기록한 끼니는 실제 식사 기록에서 수정해주세요.")
+        changed(jdbc.update("DELETE FROM meal_day_plans WHERE user_id=? AND meal_date=? AND slot_id=?",userId,date,slotId))
     }
 
     fun putMeal(userId: UUID,id: UUID,request: MealWrite): MealDto {
@@ -115,9 +133,11 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
         val written=request.items.map { MealItemWrite(uuid(it.id).toString(),uuid(it.foodId).toString(),it.grams.also { value -> value?.let(::grams) }) }
         if (written.map { it.id }.distinct().size != written.size) invalid("음식 항목이 중복됐어요.")
         val previous=old?.items?.associateBy { it.id }.orEmpty()
+        val planned=day(userId,request.date).plannedMeals.firstOrNull { it.slotId==request.slotId }?.items?.associateBy { it.id }.orEmpty()
         val snapshots=written.map { item ->
             val before=previous[item.id]
             if (before!=null && before.foodId==item.foodId) before.copy(grams=item.grams)
+            else if(planned[item.id]?.foodId==item.foodId)planned.getValue(item.id).copy(grams=item.grams)
             else {
                 val food=food(userId,uuid(item.foodId)) ?: missing("FOOD_NOT_FOUND")
                 LoggedMealItem(item.id,food.id,food.name,food.brand,food.basisGrams,food.nutrition,food.preparation,food.sourceNote,item.grams)
@@ -174,7 +194,7 @@ class MealService(private val jdbc: JdbcTemplate, private val entities: EntityMa
     private fun count(sql: String,vararg args: Any): Long = jdbc.queryForObject(sql,Long::class.java,*args)!!
     private fun version(existing: Long?,requested: Long?) { if (requested!=null && requested<0) invalid("기록 버전을 확인해주세요."); if(existing!=requested) conflict() }
     private fun changed(count: Int) { if(count!=1) conflict() }
-    private fun date(user: UserAccountEntity,value: LocalDate) { if(value<LocalDate.of(1900,1,1) || value>LocalDate.now(ZoneId.of(user.timeZone))) invalid("기록 날짜는 1900년부터 오늘까지 선택해주세요.") }
+    private fun date(user: UserAccountEntity,value: LocalDate,futureDays:Long=0) { if(value<LocalDate.of(1900,1,1) || value>LocalDate.now(ZoneId.of(user.timeZone)).plusDays(futureDays)) invalid("선택 가능한 날짜 범위를 확인해주세요.") }
     private fun grams(value: BigDecimal) { decimal(value,positive=true) }
     private fun nutrients(values: NutritionValues) { listOf(values.kcal,values.carbsG,values.proteinG,values.fatG,values.fiberG).filterNotNull().forEach { decimal(it,positive=false) } }
     private fun decimal(value: BigDecimal,positive: Boolean) { if(value.scale()>2 || value>BigDecimal("100000") || (if(positive)value.signum()<=0 else value.signum()<0)) invalid("양과 영양정보의 범위·소수 자릿수를 확인해주세요.") }

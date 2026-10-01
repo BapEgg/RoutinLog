@@ -331,6 +331,18 @@ class MealViewModelTest {
         advanceUntilIdle()
         assertTrue(viewModel.state.value.loaded)
     }
+    @Test fun `dated plan is preferred over template and preserves label snapshot`()=runTest(dispatcher) {
+        val item=meal().items.single().copy(name="초안 당시 음식",grams=d("120"))
+        repository.planned=listOf(PlannedMeal("slot-a","첫 끼니","정한 식사",listOf(item)))
+        load();viewModel.beginMeal("slot-a","첫 끼니")
+        assertEquals("초안 당시 음식",viewModel.state.value.draft!!.items.single().snapshot.name)
+        assertEquals("120",viewModel.state.value.draft!!.items.single().grams)
+    }
+    @Test fun `future day is read only and does not create an eaten or skipped record`()=runTest(dispatcher) {
+        load();viewModel.loadDate(LocalDate.now(ZoneOffset.UTC).plusDays(7).toString());advanceUntilIdle()
+        assertTrue(viewModel.state.value.loaded);viewModel.beginMeal("slot-a","첫 끼니");assertNull(viewModel.state.value.draft)
+        viewModel.skipMeal("slot-a","첫 끼니");advanceUntilIdle();assertTrue(repository.mealWrites.isEmpty())
+    }
 
     private fun d(value: String) = BigDecimal(value)
     private fun food() = FoodDto("food-a", "테스트 음식", basisGrams = d("100"), nutrition = NutritionValues(kcal = d("100")), preparation = "AS_SOLD", version = 0)
@@ -350,6 +362,7 @@ class MealViewModelTest {
         var templates = listOf(template())
         var plan = MealPlanDto(listOf(MealSlot("slot-a", "첫 끼니", "template-a"), MealSlot("slot-b", "다음 끼니", "template-a")), 0)
         var records = emptyList<MealDto>()
+        var planned = emptyList<PlannedMeal>()
         var nextDayGate: CompletableDeferred<MealDayDto>? = null
         var nextMealGate: CompletableDeferred<MealDto>? = null
         var target: NutritionValues? = null
@@ -368,7 +381,7 @@ class MealViewModelTest {
             dayReads++
             val gate = nextDayGate
             nextDayGate = null
-            return gate?.await() ?: day(records.map { it.copy(date = date) }, date).copy(target = target)
+            return gate?.await() ?: day(records.map { it.copy(date = date) }, date).copy(target = target,plannedMeals=planned)
         }
         override suspend fun saveMeal(id: String, meal: MealWrite): MealDto {
             mealWrites += id to meal

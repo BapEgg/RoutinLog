@@ -1,0 +1,26 @@
+package com.bapegg.routinlog.review
+
+import com.bapegg.routinlog.food.MealApiException
+import com.bapegg.routinlog.security.AuthenticatedUser
+import org.springframework.http.*
+import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.*
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import java.time.LocalDate
+
+@RestController @RequestMapping("/api/v1/meal-reviews")
+class MealReviewController(private val reviews:MealReviewService) {
+    @GetMapping fun history(@AuthenticationPrincipal user:AuthenticatedUser)=response(reviews.history(user.userId))
+    @GetMapping("/{week}") fun get(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable week:LocalDate)=response(reviews.get(user.userId,week))
+    @PostMapping("/{week}/prepare") fun prepare(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable week:LocalDate,@RequestBody request:ReviewPrepare)=response(reviews.prepare(user.userId,week,request))
+    @PostMapping("/{week}/decision") fun decide(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable week:LocalDate,@RequestBody request:MealReviewDecision)=response(reviews.decide(user.userId,week,request))
+    private fun <T:Any> response(value:T)=ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value)
+}
+@RestControllerAdvice(assignableTypes=[MealReviewController::class])
+class MealReviewErrors {
+    @ExceptionHandler(ReviewException::class) fun expected(e:ReviewException)=ResponseEntity.status(e.status).cacheControl(CacheControl.noStore()).body(mapOf("code" to e.code,"message" to e.message))
+    @ExceptionHandler(MealApiException::class) fun meal(e:MealApiException)=ResponseEntity.status(e.status).cacheControl(CacheControl.noStore()).body(mapOf("code" to e.code,"message" to e.message))
+    @ExceptionHandler(HttpMessageNotReadableException::class,MethodArgumentTypeMismatchException::class)
+    fun malformed()=ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(mapOf("code" to "INVALID_REQUEST","message" to "입력한 날짜와 값을 확인해주세요."))
+}

@@ -16,6 +16,7 @@ import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
 import com.bapegg.routinlog.ui.ReportViewModel
 import com.bapegg.routinlog.ui.WorkoutReviewViewModel
+import com.bapegg.routinlog.ui.MealReviewViewModel
 import com.bapegg.routinlog.ui.StepsViewModel
 import com.bapegg.routinlog.steps.*
 import java.time.Instant
@@ -49,10 +50,11 @@ class AccountFlowTest {
     private var steps: StepsViewModel? = null
     private var reports: ReportViewModel? = null
     private var reviews: WorkoutReviewViewModel? = null
+    private var mealReviews: MealReviewViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null, reviewFake: ReviewFixture? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null, reviewFake: ReviewFixture? = null, mealReviewFake: MealReviewFixture? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
@@ -60,6 +62,7 @@ class AccountFlowTest {
                 initializer { AccountViewModel(source) }
                 initializer { ReportViewModel(requireNotNull(reportFake)) }
                 initializer { WorkoutReviewViewModel(requireNotNull(reviewFake)) }
+                initializer { MealReviewViewModel(requireNotNull(mealReviewFake)) }
                 initializer { RoutineLogViewModel(SystemStatusRepository.create("", debug = true)) }
                 initializer { MealViewModel(requireNotNull(mealFake)) }
                 initializer { WorkoutViewModel(requireNotNull(workoutFake)) }
@@ -70,12 +73,13 @@ class AccountFlowTest {
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
             reports = if(reportFake==null)null else ViewModelProvider(compose.activity,factory)[ReportViewModel::class.java]
             reviews = if(reviewFake==null)null else ViewModelProvider(compose.activity,factory)[WorkoutReviewViewModel::class.java]
+            mealReviews = if(mealReviewFake==null)null else ViewModelProvider(compose.activity,factory)[MealReviewViewModel::class.java]
             meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
             steps = if(stepFake==null)null else ViewModelProvider(compose.activity,factory)[StepsViewModel::class.java]
             conditions = if (conditionFake == null) null else ViewModelProvider(compose.activity, factory)[ConditionViewModel::class.java]
             workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports, reviewModel = reviews) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports, reviewModel = reviews,mealReviewModel=mealReviews) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
         if(stepFake!=null)compose.waitUntil(5_000){steps?.state?.value?.let { it.loaded&&!it.busy }==true}
         if (conditionFake != null) compose.waitUntil(5_000) { conditions?.state?.value?.let { it.loaded && !it.loading } == true }
@@ -96,6 +100,59 @@ class AccountFlowTest {
         compose.onNodeWithText("다음 수행 초안 확인").performScrollTo().performClick()
         compose.onNodeWithText("운동 초안 만들기").performScrollTo().performClick()
         compose.waitUntil(5_000){reviews?.state?.value?.review!=null}
+    }
+    private fun openMealReview(fixture:MealReviewFixture,meals:WrapperMealDataSource?=null) {
+        start(reportFake=ReportFixture(),mealFake=meals,mealReviewFake=fixture)
+        compose.onNodeWithText("리포트",useUnmergedTree=true).performClick()
+        compose.waitUntil(5_000){reports?.state?.value?.report!=null}
+        compose.onNodeWithText("다음 식단 초안 확인").performScrollTo().performClick()
+        compose.onNodeWithText("식단 초안 만들기").performScrollTo().performClick()
+        compose.waitUntil(5_000){mealReviews?.state?.value?.review!=null}
+    }
+    @Test fun mealReviewEditsGramsConfirmsAndOpensReadOnlyFuturePlan() {
+        val mealsFake=WrapperMealDataSource();val fixture=MealReviewFixture { r->mealsFake.plannedDate=r.targetDate;mealsFake.planned=listOfNotNull(r.chosen) }
+        openMealReview(fixture,mealsFake)
+        compose.onNodeWithText("음식량 직접 수정").performScrollTo().performClick()
+        compose.onAllNodes(hasSetTextAction())[0].performScrollTo().performTextReplacement("120")
+        compose.onNodeWithText("240 kcal").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("식단 수정 내용 확인").performScrollTo().performClick()
+        compose.runOnIdle { assertNull(fixture.command) }
+        compose.onNodeWithText("확인한 식단 적용").performScrollTo().performClick()
+        compose.waitUntil(5_000){mealReviews?.state?.value?.review?.status=="APPLIED"}
+        compose.onNodeWithText("식사 계획 반영 완료").performScrollTo().assertIsDisplayed()
+        capture("qa-live-meal-review.png")
+        compose.onNodeWithText("반영된 식사 계획 보기").performScrollTo().performClick()
+        compose.waitUntil(5_000){this.meals?.state?.value?.date==fixture.saved?.targetDate&&this.meals?.state?.value?.loaded==true}
+        compose.onNodeWithText("이날 정한 식사").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("이대로 먹었어요").assertDoesNotExist()
+        compose.onNodeWithText("이날 식사 계획 해제").performScrollTo().performClick()
+        compose.onNodeWithText("계획 해제").performClick()
+        compose.waitUntil(5_000){this.meals?.state?.value?.day?.plannedMeals?.isEmpty()==true}
+        compose.runOnIdle { assertTrue(this.meals!!.state.value.day!!.items.isEmpty());source.expireFromAnotherFeature() }
+        compose.waitUntil(5_000){session().route=="A01"}
+        compose.runOnIdle { assertNull(mealReviews!!.state.value.review) }
+    }
+    @Test fun heldMealReviewAppearsInDecisionHistory() {
+        val fixture=MealReviewFixture();openMealReview(fixture)
+        compose.onNodeWithText("식단 변경은 보류").performScrollTo().performClick()
+        compose.waitUntil(5_000){mealReviews?.state?.value?.history?.isNotEmpty()==true}
+        compose.onNodeWithText("식단 변경 보류").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { assertEquals("HOLD",fixture.command!!.decision) }
+    }
+    private class MealReviewFixture(val onApplied:(MealReviewDto)->Unit={}) : MealReviewDataSource {
+        var saved:MealReviewDto?=null;var command:MealReviewDecision?=null
+        override suspend fun getMealReview(owner:String,week:String)=saved
+        override suspend fun prepareMealReview(owner:String,week:String,write:ReviewPrepare):MealReviewDto {
+            val item=LoggedMealItem("item","food","기준량 테스트 식품",basisGrams=BigDecimal("80"),nutrition=NutritionValues(kcal=BigDecimal("160")),preparation="AS_SOLD",grams=BigDecimal("80"))
+            val option=MealReviewOption("KEEP","저장한 점심",listOf(item),NutritionMath.totals(NutritionMath.loggedItems(listOf(item))))
+            return MealReviewDto(week,LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(7).toString(),"00000000-0000-0000-0000-000000000002","점심",NutritionValues(kcal=BigDecimal("2000")),emptyList(),true,listOf(option),"KEEP",emptyList(),emptyList(),"저장한 식단에서 다음 한 끼를 확인해요.",emptyList(),emptyList(),"meal-review-1","DRAFT",0).also { saved=it }
+        }
+        override suspend fun decideMealReview(owner:String,week:String,write:MealReviewDecision):MealReviewDto {
+            command=write;val r=saved!!
+            return r.copy(status=if(write.decision=="HOLD")"HELD" else "APPLIED",version=1,chosen=PlannedMeal(r.slotId!!,r.slotLabel!!,"저장한 점심",r.options.single().items.map { it.copy(grams=write.amounts.single().grams) }),decisionReason=write.reason)
+                .also { saved=it;if(write.decision=="APPLY")onApplied(it) }
+        }
+        override suspend fun mealReviewHistory(owner:String)=listOfNotNull(saved)
     }
 
     @Test fun workoutReviewCustomEditRequiresConfirmationAndClearsOnSignOut() {
@@ -816,6 +873,8 @@ class AccountFlowTest {
     /** Only methods exercised by this wrapper test are implemented; no real account or HTTP. */
     private class WrapperMealDataSource : MealDataSource {
         val foods = mutableListOf<FoodDto>()
+        var plannedDate:String?=null
+        var planned=emptyList<PlannedMeal>()
         private val plan = MealPlanDto(listOf(
             MealSlot("00000000-0000-0000-0000-000000000001", "아침"),
             MealSlot("00000000-0000-0000-0000-000000000002", "점심"),
@@ -824,7 +883,8 @@ class AccountFlowTest {
         override suspend fun listFoods() = foods.toList()
         override suspend fun listMealTemplates() = emptyList<MealTemplateDto>()
         override suspend fun getMealPlan() = plan
-        override suspend fun getMealDay(date: String) = MealDayDto(date, emptyList(), NutritionMath.totals(emptyList()), NutritionValues(kcal = BigDecimal("2300")))
+        override suspend fun getMealDay(date: String) = MealDayDto(date, emptyList(), NutritionMath.totals(emptyList()), NutritionValues(kcal = BigDecimal("2300")),if(date==plannedDate)planned else emptyList())
+        override suspend fun deleteMealDayPlan(date:String,slotId:String,version:Long) { planned=planned.filterNot { it.slotId==slotId } }
         override suspend fun saveFood(id: String, food: FoodWrite): FoodDto {
             check(food.version == null && foods.none { it.id == id })
             return FoodDto(id, food.name, food.brand, food.basisGrams, food.nutrition, food.preparation, food.sourceNote, version = 1).also { foods += it }

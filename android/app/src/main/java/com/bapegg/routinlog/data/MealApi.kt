@@ -15,4 +15,5 @@ internal interface MealApi {
     @GET("api/v1/meal-records") suspend fun getMealDay(@Header("Authorization") auth: String, @Query("date") date: String): Response<MealDayDto>
     @PUT("api/v1/meal-records/{id}") suspend fun saveMeal(@Header("Authorization") auth: String, @Path("id") id: String, @Body meal: MealWrite): Response<MealDto>
     @DELETE("api/v1/meal-records/{id}") suspend fun deleteMeal(@Header("Authorization") auth: String, @Path("id") id: String, @Query("version") version: Long): Response<Unit>
+    @DELETE("api/v1/meal-day-plans/{date}/{slotId}") suspend fun deleteMealDayPlan(@Header("Authorization") auth:String,@Path("date") date:String,@Path("slotId") slotId:String,@Query("version") version:Long):Response<Unit>
 }

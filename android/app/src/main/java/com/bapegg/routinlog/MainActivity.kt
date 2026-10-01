@@ -12,6 +12,7 @@ import com.bapegg.routinlog.ui.RoutineLogApp
 import com.bapegg.routinlog.ui.RoutineLogViewModel
 import com.bapegg.routinlog.ui.MealViewModel
 import com.bapegg.routinlog.ui.WorkoutReviewViewModel
+import com.bapegg.routinlog.ui.MealReviewViewModel
 import com.bapegg.routinlog.ui.ReportViewModel
 import com.bapegg.routinlog.ui.StepsViewModel
 import com.bapegg.routinlog.steps.RoutineLogServices
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         val reviewFactory = viewModelFactory { initializer { WorkoutReviewViewModel(repository) } }
+        val mealReviewFactory = viewModelFactory { initializer { MealReviewViewModel(repository) } }
         val reportFactory = viewModelFactory { initializer { ReportViewModel(repository) } }
         val stepsFactory = viewModelFactory { initializer { StepsViewModel(repository,services.steps) } }
         val mealFactory = viewModelFactory { initializer { MealViewModel(repository) } }
@@ -49,9 +51,10 @@ class MainActivity : ComponentActivity() {
                 val workouts: WorkoutViewModel = viewModel(factory = workoutFactory)
                 val conditions: ConditionViewModel = viewModel(factory = conditionFactory)
                 val reviews: WorkoutReviewViewModel = viewModel(factory = reviewFactory)
+                val mealReviews: MealReviewViewModel = viewModel(factory = mealReviewFactory)
                 val reports: ReportViewModel = viewModel(factory = reportFactory)
                 val steps: StepsViewModel = viewModel(factory = stepsFactory)
-                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps, reports, reviews)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps, reports, reviews,mealReviews)
             }
         }
     }

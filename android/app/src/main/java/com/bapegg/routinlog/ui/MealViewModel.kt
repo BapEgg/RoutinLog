@@ -79,8 +79,8 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     fun loadDate(date: String) {
         if (state.value.busy) return
         val parsed = runCatching { LocalDate.parse(date) }.getOrNull()
-        if (parsed == null || parsed !in LocalDate.of(1900, 1, 1)..LocalDate.now(zone)) {
-            fail("1900년부터 오늘까지의 날짜를 선택해주세요."); return
+        if (parsed == null || parsed !in LocalDate.of(1900, 1, 1)..LocalDate.now(zone).plusDays(14)) {
+            fail("오늘부터 14일 뒤까지 계획을 확인할 수 있어요."); return
         }
         mutableState.update { it.copy(date = date, day = null, draft = null, loaded = false) }
         refresh()
@@ -89,15 +89,18 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     fun beginMeal(slotId: String, label: String) {
         if (!state.value.loaded || state.value.busy || state.value.loading) return
         val current = state.value
+        if(LocalDate.parse(current.date)>LocalDate.now(zone)){fail("아직 오지 않은 날짜에는 섭취 기록을 남길 수 없어요.");return}
         val record = current.day?.items?.firstOrNull { it.slotId == slotId }
+        val planned=current.day?.plannedMeals.orEmpty().firstOrNull { it.slotId==slotId }
         val templateId = current.plan?.slots?.firstOrNull { it.id == slotId }?.templateId
         val template = current.templates.firstOrNull { it.id == templateId }
-        if (record?.status != "EATEN" && templateId != null &&
+        if (record?.status != "EATEN" && planned==null && templateId != null &&
             (template == null || template.items.any { item -> current.foods.none { it.id == item.foodId } })) {
             fail("저장 식단의 음식 정보가 변경됐어요. 다시 불러온 뒤 기록해주세요.")
             return
         }
         val items = if (record?.status == "EATEN") record.items.map { it.toDraft() }
+        else if(planned!=null)planned.items.map { it.toDraft() }
         else template?.items.orEmpty().map { item ->
             current.foods.first { it.id == item.foodId }.snapshot(item.grams).toDraft()
         }
@@ -139,6 +142,7 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
     }
     fun skipMeal(slotId: String, label: String, onSaved: () -> Unit = {}) {
         val current = state.value
+        if(LocalDate.parse(current.date)>LocalDate.now(zone)){fail("아직 오지 않은 날짜에는 섭취 기록을 남길 수 없어요.");return}
         val record = current.day?.items?.firstOrNull { it.slotId == slotId }
         mutate {
             val saved = repository.saveMeal(record?.id ?: newId(), MealWrite(current.date, slotId,
@@ -187,6 +191,13 @@ class MealViewModel(private val repository: MealDataSource) : ViewModel() {
         onSaved()
     }
     fun clearError() = mutableState.update { it.copy(error = null) }
+    fun removeDayPlan(plan:PlannedMeal) {
+        val date=state.value.date
+        mutate {
+            repository.deleteMealDayPlan(date,plan.slotId,plan.version);currentCoroutineContext().ensureActive()
+            mutableState.update { s->s.copy(day=s.day?.copy(plannedMeals=s.day.plannedMeals.orEmpty().filterNot { it.slotId==plan.slotId }),draft=s.draft?.takeUnless { it.slotId==plan.slotId&&it.date==date },notice="이날 식사 계획을 해제했어요.") }
+        }
+    }
     fun clearNotice() = mutableState.update { it.copy(notice = null) }
 
     private fun confirmMeal(saved: MealDto) {

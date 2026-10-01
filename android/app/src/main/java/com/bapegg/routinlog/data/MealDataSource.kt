@@ -13,4 +13,5 @@ interface MealDataSource {
     suspend fun getMealDay(date: String): MealDayDto
     suspend fun saveMeal(id: String, meal: MealWrite): MealDto
     suspend fun deleteMeal(id: String, version: Long)
+    suspend fun deleteMealDayPlan(date:String,slotId:String,version:Long):Unit = throw UnsupportedOperationException("Dated meal plans are not supported by this data source")
 }

@@ -16,7 +16,7 @@ class PreviewSessionTest {
         assertTrue(ui.values.isEmpty());assertFalse(ui.previewMode);assertEquals("A01",ui.route)
     }
     @Test fun theCatalogIncludesEveryDesignedRouteAndValidBackTargets(){
-        assertEquals(67,ScreenCatalog.size)
+        assertEquals(73,ScreenCatalog.size)
         ScreenCatalog.values.forEach{assertTrue("Missing back route for ${it.id}",it.back==null||it.back in ScreenCatalog)}
     }
 }

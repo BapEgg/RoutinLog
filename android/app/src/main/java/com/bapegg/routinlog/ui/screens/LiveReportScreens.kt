@@ -19,6 +19,7 @@ import java.util.Locale
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.owner) { if(state.owner!=null&&state.report==null&&!state.loading)model.refresh() }
     val reviews=LocalWorkoutReviews.current
+    val mealReviews=LocalMealReviews.current
     val report=state.report
     if(state.loading) { UiCard { Text("한 주의 기록을 모으고 있어요.");LinearProgressIndicator(Modifier.fillMaxWidth(),color=DeepBlue) };return }
     if(state.error!=null) { UiCard { Text(state.error!!);UiButton("리포트 다시 불러오기",model::refresh) };return }
@@ -64,6 +65,10 @@ import java.util.Locale
                 UiButton("지난 초안과 내 선택",{ui.go("R09")},false)
             }
             UiButton("최신 기록으로 새로고침",model::refresh,false)
+            if(mealReviews!=null) {
+                UiButton("다음 식단 초안 확인",{mealReviews.open(report.from);ui.go("R12")})
+                UiButton("지난 식단 선택",{ui.go("R16")},false)
+            }
         }
         "R02" -> NutritionReport(report)
         "R03" -> WorkoutReport(report)

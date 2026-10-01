@@ -15,7 +15,7 @@ class NativePreviewTest {
     private fun open(id:String){compose.runOnIdle{session().previewMode=true;session().go(id)};compose.waitForIdle()}
 
     @Test fun everyDesignedRouteRendersAndCanReturn(){
-        assertEquals(67,ScreenCatalog.size)
+        assertEquals(73,ScreenCatalog.size)
         for((id,screen) in ScreenCatalog){
             compose.runOnIdle{session().reset()}
             open(id)

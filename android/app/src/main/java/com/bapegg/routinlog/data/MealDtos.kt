@@ -102,6 +102,7 @@ import java.math.BigDecimal
 ) {
     override fun toString() = "MealDto(redacted)"
 }
-@Keep data class MealDayDto(val date: String, val items: List<MealDto>, val totals: NutritionTotals, val target: NutritionValues? = null) {
+@Keep data class PlannedMeal(val slotId:String,val slotLabel:String,val name:String,val items:List<LoggedMealItem>,val version:Long=0)
+@Keep data class MealDayDto(val date: String, val items: List<MealDto>, val totals: NutritionTotals, val target: NutritionValues? = null,val plannedMeals:List<PlannedMeal> = emptyList()) {
     override fun toString() = "MealDayDto(redacted)"
 }

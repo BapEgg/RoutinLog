@@ -38,6 +38,10 @@ class MealController(private val meals: MealService) {
     fun plan(@AuthenticationPrincipal user: AuthenticatedUser,@RequestBody request: MealPlanWrite)=privateResponse(meals.putPlan(user.userId,request))
     @GetMapping("/meal-records")
     fun day(@AuthenticationPrincipal user: AuthenticatedUser,@RequestParam date: LocalDate)=privateResponse(meals.day(user.userId,date))
+    @DeleteMapping("/meal-day-plans/{date}/{slotId}")
+    fun deleteDayPlan(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable date:LocalDate,@PathVariable slotId:String,@RequestParam version:Long):ResponseEntity<Void> {
+        meals.deleteDayPlan(user.userId,date,uuid(slotId),version);return emptyResponse()
+    }
     @PutMapping("/meal-records/{id}")
     fun meal(@AuthenticationPrincipal user: AuthenticatedUser,@PathVariable id: String,@RequestBody request: MealWrite)=privateResponse(meals.putMeal(user.userId,uuid(id),request))
     @DeleteMapping("/meal-records/{id}")

@@ -81,7 +81,9 @@ private fun LiveMealDay(ui: PreviewSession, model: MealViewModel, state: MealUiS
     var discard by remember { mutableStateOf(false) }
     var skip by remember { mutableStateOf<MealSlot?>(null) }
     var remove by remember { mutableStateOf<MealDto?>(null) }
+    var cancelPlan by remember { mutableStateOf<PlannedMeal?>(null) }
     val day = state.day?.takeIf { it.date == state.date }
+    val future=state.date>ui.today().toString()
     fun changeDate(date: String) {
         if (date == state.date) { dateOpen = false; return }
         if (state.draft != null) pendingDate = date else model.loadDate(date)
@@ -98,7 +100,7 @@ private fun LiveMealDay(ui: PreviewSession, model: MealViewModel, state: MealUiS
     }
     UiCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { MutedText("식사 기록일"); Text(state.date, style = MaterialTheme.typography.titleMedium) }
+            Column(Modifier.weight(1f)) { MutedText(if(future)"식사 계획일" else "식사 기록일"); Text(state.date, style = MaterialTheme.typography.titleMedium) }
             TextButton(onClick = { dateOpen = !dateOpen }) { Text(if (dateOpen) "접기" else "날짜 변경") }
         }
         if (dateOpen) {
@@ -109,7 +111,7 @@ private fun LiveMealDay(ui: PreviewSession, model: MealViewModel, state: MealUiS
             FoodError(dateError)
             UiButton("이 날짜 보기", {
                 val date = runCatching { LocalDate.parse(dateText) }.getOrNull()
-                if (date == null || date !in LocalDate.of(1900, 1, 1)..ui.today()) dateError = "1900년부터 오늘까지의 날짜를 입력해주세요."
+                if (date == null || date !in LocalDate.of(1900, 1, 1)..ui.today().plusDays(14)) dateError = "1900년부터 오늘의 14일 뒤까지 확인할 수 있어요."
                 else changeDate(date.toString())
             }, primary = false)
         }
@@ -134,9 +136,12 @@ private fun LiveMealDay(ui: PreviewSession, model: MealViewModel, state: MealUiS
     SectionTitle("나의 끼니", "기본 식단 설정", { ui.go("F02") })
     val slots = state.plan?.slots.orEmpty().toMutableList()
     day.items.filter { record -> slots.none { it.id == record.slotId } }.forEach { slots += MealSlot(it.slotId, it.slotLabel) }
+    day.plannedMeals.orEmpty().filter { planned->slots.none { it.id==planned.slotId } }.forEach { slots+=MealSlot(it.slotId,it.slotLabel) }
+    if(future)MutedText("미리 정한 식사 계획이에요. 실제 섭취 기록은 해당 날짜부터 남길 수 있어요.")
     slots.forEach { slot ->
         val record = day.items.firstOrNull { it.slotId == slot.id }
         val template = state.templates.firstOrNull { it.id == slot.templateId }
+        val planned=day.plannedMeals.orEmpty().firstOrNull { it.slotId==slot.id }
         UiCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(record?.slotLabel ?: slot.label, style = MaterialTheme.typography.titleMedium)
@@ -155,14 +160,18 @@ private fun LiveMealDay(ui: PreviewSession, model: MealViewModel, state: MealUiS
                     if (record.items.any { it.grams == null }) MutedText("양을 모르는 음식이 있어요. 전체 섭취량은 아직 알 수 없어요.")
                 }
                 "SKIPPED" -> MutedText("이 끼니는 먹지 않은 것으로 남겼어요.")
-                else -> MutedText(template?.name ?: "먹은 음식을 선택해 기록해주세요.")
+                else -> {
+                    MutedText(planned?.name ?: template?.name ?: "먹은 음식을 선택해 기록해주세요.")
+                    if(planned!=null){ Badge("이날 정한 식사");planned.items.forEach { MutedText("${it.name} · ${it.grams?.stripTrailingZeros()?.toPlainString()} g") } }
+                }
             }
-            if (record == null && template != null) {
+            if(planned!=null&&record==null&&state.date>=ui.today().toString())UiButton("이날 식사 계획 해제",{cancelPlan=planned},false)
+            if (!future && record == null && (template != null||planned!=null)) {
                 UiButton("이대로 먹었어요", { begin(slot, directly = true) })
                 UiButton("음식·양 바꿔 기록", { begin(slot) }, primary = false)
-            } else UiButton(if (record?.status == "EATEN") "구성·양 수정" else "먹은 음식 기록", { begin(slot) })
+            } else if(!future)UiButton(if (record?.status == "EATEN") "구성·양 수정" else "먹은 음식 기록", { begin(slot) })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                if (record?.status != "SKIPPED") TextButton(onClick = {
+                if (!future && record?.status != "SKIPPED") TextButton(onClick = {
                     if (record?.status == "EATEN" || state.draft?.slotId == slot.id) skip = slot else model.skipMeal(slot.id, slot.label)
                 }) { Text("먹지 않았어요") }
                 if (record != null) TextButton(onClick = { remove = record }) { Text("기록 지우기", color = MaterialTheme.colorScheme.error) }
@@ -173,6 +182,7 @@ private fun LiveMealDay(ui: PreviewSession, model: MealViewModel, state: MealUiS
     UiButton("서버에서 새로 불러오기", model::refresh, primary = false)
     MutedText("확인 전인 끼니는 섭취량에 포함하지 않아요. 식단 설정을 바꿔도 지난 기록은 그대로 남아요.")
     if (discard) FoodConfirm("작성 내용을 버릴까요?", "아직 저장하지 않은 식사의 수정 내용이 사라져요.", "버리기", { discard = false }) { model.discardDraft(); discard = false }
+    cancelPlan?.let { plan->FoodConfirm("이날 식사 계획을 해제할까요?","${state.date} ${plan.slotLabel}에 적용한 계획을 해제해요. 저장한 기본 식단을 다시 불러오고 작성 중인 해당 끼니는 비워요.","계획 해제",{cancelPlan=null}) {cancelPlan=null;model.removeDayPlan(plan)} }
     pendingDate?.let { date -> FoodConfirm("다른 날짜로 이동할까요?", "작성 중인 식사를 저장하지 않고 이동해요.", "이동", { pendingDate = null }) { pendingDate = null; model.loadDate(date) } }
     pendingMeal?.let { slot -> FoodConfirm("다른 끼니를 기록할까요?", "작성 중인 식사의 저장하지 않은 변경은 사라져요.", "새로 작성", { pendingMeal = null }) {
         pendingMeal = null; model.discardDraft(); model.beginMeal(slot.id, slot.label); ui.go("F03")

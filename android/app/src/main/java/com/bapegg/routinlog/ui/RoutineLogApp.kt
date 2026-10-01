@@ -42,9 +42,15 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null,reportModel:ReportViewModel?=null,reviewModel:WorkoutReviewViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null,reportModel:ReportViewModel?=null,reviewModel:WorkoutReviewViewModel?=null,mealReviewModel:MealReviewViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
+    LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.version) { mealReviewModel?.bind(accountState.userId.takeIf { accountState.ready&&accountState.profile!=null }) }
+    LaunchedEffect(ui.route,ui.get("mealReview.appliedDate")) {
+        if(ui.accountMode&&ui.route=="F01"&&ui.get("mealReview.appliedDate").isNotBlank()) {
+            val date=ui.get("mealReview.appliedDate");ui.set("mealReview.appliedDate","");mealModel?.loadDate(date)
+        }
+    }
     LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
         reportModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile!=null },accountState.profile?.timeZone)
     }
@@ -149,7 +155,7 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel,LocalReports provides reportModel,LocalWorkoutReviews provides reviewModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
+    CompositionLocalProvider(LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel,LocalReports provides reportModel,LocalWorkoutReviews provides reviewModel,LocalMealReviews provides mealReviewModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -212,6 +218,7 @@ import java.math.RoundingMode
 @Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?,workoutModel:WorkoutViewModel?){
     // The outgoing animated screen must never switch to sample data after sign-out.
     if(!ui.accountMode && !ui.previewMode && id!="A01")return
+    if(id in setOf("R12","R13","R14","R15","R16","R17")) { if(ui.accountMode)LocalMealReviews.current?.let { LiveMealReviewScreens(id,ui,it) } ?: LiveFeaturePending(ui) else UiCard { Text("내 계정에서 식사 기록을 바탕으로 확인할 수 있어요.") };return }
     if(ui.accountMode && id in setOf("R05","R06","R07","R08","R09","R11")) { LocalWorkoutReviews.current?.let { LiveWorkoutReviewScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("R01","R02","R03","R04")) { LocalReports.current?.let { LiveReportScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("H06","S03")) { LocalSteps.current?.let { LiveStepsScreen(ui,it) } ?: LiveFeaturePending(ui);return }

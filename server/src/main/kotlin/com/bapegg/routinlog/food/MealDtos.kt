@@ -42,4 +42,5 @@ data class MealDto(
     val id: String, val date: LocalDate, val slotId: String, val slotLabel: String, val status: MealStatus,
     val items: List<LoggedMealItem>, val note: String?, val version: Long, val totals: NutritionTotals,
 )
-data class MealDayDto(val date: LocalDate, val items: List<MealDto>, val totals: NutritionTotals, val target: NutritionValues?)
+data class PlannedMeal(val slotId:String,val slotLabel:String,val name:String,val items:List<LoggedMealItem>,val version:Long=0)
+data class MealDayDto(val date: LocalDate, val items: List<MealDto>, val totals: NutritionTotals, val target: NutritionValues?,val plannedMeals:List<PlannedMeal> = emptyList())
