@@ -38,9 +38,17 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
+    val conditionState = conditionModel?.state?.collectAsStateWithLifecycle()?.value
+    LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
+        conditionModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile!=null },accountState.profile?.timeZone)
+    }
+    LaunchedEffect(ui.get("home.date"),ui.accountMode,accountState.userId,accountState.ready,accountState.profile?.timeZone) {
+        if(ui.accountMode && accountState.ready && accountState.profile!=null)conditionModel?.selectDate(ui.get("home.date",LocalDate.now(java.time.ZoneId.of(accountState.profile.timeZone)).toString()))
+    }
+    LaunchedEffect(conditionState?.notice) { conditionState?.notice?.let { ui.notify(it);conditionModel?.clearNotice() } }
     val context = LocalContext.current
     val mealState = mealModel?.state?.collectAsStateWithLifecycle()?.value
     val workoutState = workoutModel?.state?.collectAsStateWithLifecycle()?.value
@@ -109,7 +117,7 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalAccount provides actions) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
+    CompositionLocalProvider(LocalAccount provides actions,LocalConditions provides conditionModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,6 +180,7 @@ import java.math.RoundingMode
 @Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?,workoutModel:WorkoutViewModel?){
     // The outgoing animated screen must never switch to sample data after sign-out.
     if(!ui.accountMode && !ui.previewMode && id!="A01")return
+    if(ui.accountMode && id=="H07") { LocalConditions.current?.let { LiveConditionScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F13","F14") && mealModel!=null) {
         LiveFoodScreens(id,ui,mealModel);return
     }

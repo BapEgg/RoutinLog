@@ -3,6 +3,7 @@ package com.bapegg.routinlog.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +39,9 @@ import java.util.Locale
     UiCard {
         UiRow("운동 기록", "요일별 루틴과 실제 수행한 세트를 함께 남겨요", icon="Dumbbell", onClick={ui.go("W01")})
     }
+    val conditions=LocalConditions.current?.state?.collectAsStateWithLifecycle()?.value
+    UiCard { UiRow(if(date==ui.today())"오늘의 컨디션"else"이날의 컨디션",
+        conditions?.records?.firstOrNull { it.date==date.toString() }?.let { conditionSummary(it.values) } ?: "수면·피로·근육통·생활 활동을 남겨요",icon="HeartPulse",onClick={ui.go("H07")}) }
     account.state.profile?.let {profile->
         UiCard {
             SectionTitle("내 시작 목표","수정",{ui.go("S02")})
@@ -104,7 +108,7 @@ import java.util.Locale
     UiCard {
         Badge("Google 로그인 완료")
         SectionTitle("나의 루틴로그")
-        MutedText("시작 설정과 신체·식단·운동 기록을 내 계정에 보관해요.")
+        MutedText("시작 설정과 신체·식단·운동·컨디션 기록을 내 계정에 보관해요.")
     }
     if(!accountPage)UiCard {
         UiRow("프로필 · 목표 · 단위", "저장한 기준 확인과 수정",icon="UserRound",onClick={ui.go("S02")})
@@ -125,7 +129,7 @@ import java.util.Locale
     val account=LocalAccount.current
     UiCard {
         SectionTitle("계정과 기록을 삭제할까요?")
-        BodyText("프로필·목표 변경 이력·체중·허리둘레·메모, 등록 음식·저장 식사·기본 식단·섭취 기록, 등록 운동·루틴·요일 계획과 변경 이력·세트 기록을 모두 삭제해요. 모든 기기의 로그인 연결도 해제해요.")
+        BodyText("프로필·목표 변경 이력·체중·허리둘레·컨디션·수면·메모, 등록 음식·저장 식사·기본 식단·섭취 기록, 등록 운동·루틴·요일 계획과 변경 이력·세트 기록을 모두 삭제해요. 모든 기기의 로그인 연결도 해제해요.")
         MutedText("Google 계정 자체는 삭제하지 않아요. 삭제 후에는 기록을 되돌릴 수 없어요.")
         MutedText("먼저 Google에서 현재 계정의 본인 확인을 진행해요. 다른 계정을 선택하면 삭제되지 않아요.")
     }

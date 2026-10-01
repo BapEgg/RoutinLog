@@ -11,6 +11,7 @@ import com.bapegg.routinlog.data.SystemStatusRepository
 import com.bapegg.routinlog.ui.RoutineLogApp
 import com.bapegg.routinlog.ui.RoutineLogViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.ConditionViewModel
 import com.bapegg.routinlog.ui.WorkoutViewModel
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.data.AccountRepository
@@ -31,6 +32,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         val mealFactory = viewModelFactory { initializer { MealViewModel(repository) } }
+        val conditionFactory = viewModelFactory { initializer { ConditionViewModel(repository) } }
         val workoutFactory = viewModelFactory { initializer { WorkoutViewModel(repository) } }
         setContent {
             RoutineLogTheme {
@@ -38,7 +40,8 @@ class MainActivity : ComponentActivity() {
                 val account: AccountViewModel = viewModel(factory = factory)
                 val meals: MealViewModel = viewModel(factory = mealFactory)
                 val workouts: WorkoutViewModel = viewModel(factory = workoutFactory)
-                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts)
+                val conditions: ConditionViewModel = viewModel(factory = conditionFactory)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions)
             }
         }
     }

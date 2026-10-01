@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource, MealDataSource, WorkoutDataSource {
+) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -155,6 +155,10 @@ class AccountRepository internal constructor(
     override suspend fun deleteBody(date: String, version: Long) {
         authorized { api.deleteBody("Bearer ${it.accessToken}", date, version) }.checkStatus()
     }
+
+    override suspend fun listConditions(from:String,to:String):List<ConditionDto> = authorized { api.listConditions("Bearer ${it.accessToken}",from,to) }.required().items
+    override suspend fun saveCondition(date:String,write:ConditionWrite):ConditionDto = authorized { api.saveCondition("Bearer ${it.accessToken}",date,write) }.required()
+    override suspend fun deleteCondition(date:String,version:Long) { authorized { api.deleteCondition("Bearer ${it.accessToken}",date,version) }.checkStatus() }
 
     override suspend fun listFoods(): List<FoodDto> = authorized { api.listFoods("Bearer ${it.accessToken}") }.required().items
 
@@ -307,7 +311,7 @@ private fun malformed(): Nothing = throw AccountException(AccountErrorKind.SERVE
 private fun <T> Response<T>.required(): T { checkStatus(); return body() ?: malformed() }
 private fun Response<*>.checkStatus() { if (!isSuccessful) throw error() }
 private fun Response<*>.error(): AccountException {
-    val knownCodes = setOf("PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
+    val knownCodes = setOf("CONDITION_NOT_FOUND", "PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
     val serverCode = runCatching {
         errorBody()?.use { body ->
             val reader = body.charStream()

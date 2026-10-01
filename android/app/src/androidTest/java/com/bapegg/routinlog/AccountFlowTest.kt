@@ -14,6 +14,7 @@ import com.bapegg.routinlog.domain.NutritionMath
 import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.ConditionViewModel
 import com.bapegg.routinlog.ui.WorkoutViewModel
 import com.bapegg.routinlog.ui.PreviewSession
 import com.bapegg.routinlog.ui.RoutineLogApp
@@ -39,10 +40,11 @@ class AccountFlowTest {
     private lateinit var source: FakeAccountDataSource
     private var meals: MealViewModel? = null
     private var workouts: WorkoutViewModel? = null
+    private var conditions: ConditionViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
@@ -51,14 +53,17 @@ class AccountFlowTest {
                 initializer { RoutineLogViewModel(SystemStatusRepository.create("", debug = true)) }
                 initializer { MealViewModel(requireNotNull(mealFake)) }
                 initializer { WorkoutViewModel(requireNotNull(workoutFake)) }
+                initializer { ConditionViewModel(requireNotNull(conditionFake)) }
             }
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
             meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
+            conditions = if (conditionFake == null) null else ViewModelProvider(compose.activity, factory)[ConditionViewModel::class.java]
             workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
+        if (conditionFake != null) compose.waitUntil(5_000) { conditions?.state?.value?.let { it.loaded && !it.loading } == true }
         if (mealFake != null) compose.waitUntil(5_000) { meals?.state?.value?.let { it.loaded && !it.loading } == true }
         if (workoutFake != null) compose.waitUntil(5_000) { workouts?.state?.value?.let { it.loaded && !it.loading } == true }
         compose.waitForIdle()
@@ -450,6 +455,84 @@ class AccountFlowTest {
             // Only local state is cleared by expiry; persisted definitions stay intact.
             assertEquals(1, workoutSource.exercises.size)
         }
+    }
+
+    private fun openCondition() {
+        val navigation = compose.runOnIdle { session() }
+        compose.waitUntil(10_000) { navigation.message == null }
+        compose.onNodeWithText("오늘의 컨디션").performScrollTo().performClick()
+        compose.onNodeWithText("지난밤 수면").assertExists()
+    }
+
+    @Test fun conditionScreenSavesEditsAndDeletesRealMinuteValues() {
+        val stored = WrapperConditionDataSource()
+        start(conditionFake = stored)
+        openCondition()
+        compose.onNodeWithContentDescription("수면 시간").performScrollTo().performTextReplacement("6")
+        compose.onNodeWithContentDescription("수면 분").performTextReplacement("35")
+        compose.onNodeWithText("지난밤 수면").performScrollTo()
+        capture("qa-live-condition.png")
+        compose.onNodeWithText("조금").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("뻐근한 부위 · 선택").performScrollTo().performTextReplacement("하체")
+        compose.onNodeWithContentDescription("기억하고 싶은 변화").performScrollTo().performTextReplacement("어제보다 가벼워요")
+        compose.onNodeWithText("컨디션 저장").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals("H01", session().route)
+            assertEquals(395, stored.records.getValue(source.today).values.sleepMinutes)
+            assertEquals("하체", stored.records.getValue(source.today).values.sorenessArea)
+            assertEquals("어제보다 가벼워요", stored.records.getValue(source.today).values.memo)
+        }
+        openCondition()
+        compose.onNodeWithContentDescription("수면 분").assertTextContains("35")
+        compose.onNodeWithContentDescription("수면 분").performTextReplacement("45")
+        compose.onNodeWithText("컨디션 저장").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(405, stored.records.getValue(source.today).values.sleepMinutes); assertEquals(1L, stored.records.getValue(source.today).version) }
+        openCondition()
+        compose.onNodeWithText("이날 컨디션 삭제").performScrollTo().performClick()
+        compose.onNodeWithText("삭제", useUnmergedTree = true).performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals("H01", session().route);assertTrue(stored.records.isEmpty());assertNull(conditions?.state?.value?.record) }
+    }
+
+    @Test fun failedConditionSaveKeepsInputForRetry() {
+        val stored = WrapperConditionDataSource()
+        start(conditionFake = stored)
+        openCondition()
+        compose.onNodeWithText("없음").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("기억하고 싶은 변화").performScrollTo().performTextReplacement("지우면 안 되는 메모")
+        compose.runOnIdle { stored.failure = AccountException(AccountErrorKind.NETWORK,"연결을 확인해주세요.") }
+        compose.onNodeWithText("컨디션 저장").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals("H07",session().route);assertTrue(stored.records.isEmpty());assertEquals("지우면 안 되는 메모",conditions?.state?.value?.draft?.values?.memo) }
+        compose.onNodeWithContentDescription("기억하고 싶은 변화").assertTextContains("지우면 안 되는 메모")
+        compose.runOnIdle { stored.failure = null }
+        compose.onNodeWithText("컨디션 저장").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertNull(stored.records.getValue(source.today).values.sleepMinutes);assertEquals("NONE",stored.records.getValue(source.today).values.soreness) }
+    }
+
+    @Test fun conditionDraftIsClearedWhenAccountExpires() {
+        start(conditionFake = WrapperConditionDataSource())
+        openCondition()
+        compose.onNodeWithContentDescription("수면 시간").performScrollTo().performTextReplacement("8")
+        compose.runOnIdle { source.expireFromAnotherFeature() }
+        compose.waitForIdle()
+        compose.onNodeWithText("로그인 없이 둘러보기").assertExists()
+        compose.runOnIdle { assertNull(conditions?.state?.value?.userId);assertTrue(requireNotNull(conditions).state.value.drafts.isEmpty());assertTrue(requireNotNull(conditions).state.value.records.isEmpty()) }
+    }
+
+    private class WrapperConditionDataSource : ConditionDataSource {
+        val records = linkedMapOf<String,ConditionDto>()
+        var failure: AccountException? = null
+        override suspend fun listConditions(from:String,to:String)=records.values.filter { it.date in from..to }.sortedByDescending { it.date }
+        override suspend fun saveCondition(date:String,write:ConditionWrite):ConditionDto {
+            failure?.let { throw it }
+            check(records[date]?.version == write.version)
+            return ConditionDto(date,write.values,(write.version ?: -1)+1).also { records[date]=it }
+        }
+        override suspend fun deleteCondition(date:String,version:Long) { check(records[date]?.version == version);records.remove(date) }
     }
 
     private fun assertAccountStillLoaded() {
