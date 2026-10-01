@@ -92,6 +92,27 @@ class WorkoutService(private val jdbc:JdbcTemplate,private val entities:EntityMa
         val old=override(userId,date) ?: missing("OVERRIDE_NOT_FOUND"); version(old.version,expectedVersion)
         changed(jdbc.update("DELETE FROM workout_overrides WHERE user_id=? AND workout_date=? AND version=?",userId,date,expectedVersion))
     }
+    /** Only the review service supplies the trusted server snapshot; clients cannot replace exercise definitions. */
+    internal fun applyReview(userId:UUID,expected:WorkoutDayDto,entryId:String,targets:List<PlannedSet>):WorkoutOverrideDto {
+        val user=account(userId,true)
+        if(expected.date<today(user))fail(HttpStatus.CONFLICT,"REVIEW_STALE","지난 날짜에는 초안을 적용할 수 없어요.")
+        val current=days(userId,expected.date,expected.date).items.single()
+        if(current!=expected || current.session!=null)fail(HttpStatus.CONFLICT,"REVIEW_STALE","운동 계획이나 기록이 바뀌었어요. 초안을 다시 확인해주세요.")
+        val planned=current.planned ?: invalid()
+        val entry=planned.entries.singleOrNull { it.id==entryId } ?: invalid()
+        val editable=entry.sets.filterNot { it.warmup }
+        if(targets.map { it.id }.sorted()!=editable.map { it.id }.sorted())invalid()
+        targets.forEach { metrics(entry.exercise.recordType,it.weightKg,it.reps,it.durationSeconds,true) }
+        val byId=targets.associateBy { it.id }
+        val updated=planned.copy(entries=planned.entries.map { original->if(original.id!=entryId)original else original.copy(sets=original.sets.map { old->
+            byId[old.id]?.let { old.copy(weightKg=it.weightKg,reps=it.reps,durationSeconds=it.durationSeconds) } ?: old
+        }) })
+        val old=current.override
+        val result=WorkoutOverrideDto(current.date,updated.routineId,updated,old?.note,old?.version?.plus(1) ?: 0)
+        if(old==null)jdbc.update("INSERT INTO workout_overrides(user_id,workout_date,version,payload) VALUES(?,?,?,?)",userId,current.date,result.version,encode(result))
+        else changed(jdbc.update("UPDATE workout_overrides SET version=?,payload=? WHERE user_id=? AND workout_date=? AND version=?",result.version,encode(result),userId,current.date,old.version))
+        return result
+    }
     fun start(userId:UUID,id:UUID,request:WorkoutStartWrite):WorkoutSessionDto {
         val user=account(userId,true); date(user,request.date)
         session(userId,id)?.let { if(it.date!=request.date) invalid(); return it }

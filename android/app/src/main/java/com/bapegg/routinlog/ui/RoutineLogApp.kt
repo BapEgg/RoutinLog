@@ -42,7 +42,7 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null,reportModel:ReportViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null,reportModel:ReportViewModel?=null,reviewModel:WorkoutReviewViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
     LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
@@ -50,6 +50,14 @@ import java.math.RoundingMode
     }
     LaunchedEffect(ui.route,accountState.ready,accountState.userId,accountState.profile?.version) {
         if(ui.accountMode && ui.route=="R01" && accountState.ready)reportModel?.refresh()
+    }
+    LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.units) {
+        reviewModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile!=null },accountState.profile?.units ?: "METRIC")
+    }
+    LaunchedEffect(ui.route,ui.get("review.appliedDate")) {
+        if(ui.accountMode && ui.route=="W01" && ui.get("review.appliedDate").isNotBlank()) {
+            val date=ui.get("review.appliedDate");ui.set("review.appliedDate", "");workoutModel?.loadDate(date)
+        }
     }
     val stepsState=stepsModel?.state?.collectAsStateWithLifecycle()?.value
     LaunchedEffect(accountState.userId,accountState.initializing,accountState.busy,accountState.profile?.timeZone) {
@@ -141,7 +149,7 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel,LocalReports provides reportModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
+    CompositionLocalProvider(LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel,LocalReports provides reportModel,LocalWorkoutReviews provides reviewModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,7 +161,7 @@ import java.math.RoundingMode
     LaunchedEffect(initialRoute){if(BuildConfig.DEBUG && initialRoute in ScreenCatalog){ui.previewMode=true;ui.go(initialRoute!!)}}
     LaunchedEffect(ui.message){ui.message?.let {snackbar.showSnackbar(it);ui.message=null}}
     BackHandler(enabled=ui.route!="A01"){ui.back()}
-    val sheet=ui.route=="R06" || (ui.route=="F04" && !ui.accountMode)
+    val sheet=(ui.route=="R06" && !ui.accountMode) || (ui.route=="F04" && !ui.accountMode)
     val base=if(sheet)ScreenCatalog.getValue(ui.route).back!! else ui.route
     val keyboard=WindowInsets.ime.getBottom(LocalDensity.current)>0
     Scaffold(containerColor=Silver,snackbarHost={SnackbarHost(snackbar)},topBar={
@@ -204,7 +212,8 @@ import java.math.RoundingMode
 @Composable private fun ScreenContent(id:String,ui:PreviewSession,mealModel:MealViewModel?,workoutModel:WorkoutViewModel?){
     // The outgoing animated screen must never switch to sample data after sign-out.
     if(!ui.accountMode && !ui.previewMode && id!="A01")return
-    if(ui.accountMode && id in setOf("R01","R02","R03","R04","R09")) { LocalReports.current?.let { LiveReportScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
+    if(ui.accountMode && id in setOf("R05","R06","R07","R08","R09","R11")) { LocalWorkoutReviews.current?.let { LiveWorkoutReviewScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
+    if(ui.accountMode && id in setOf("R01","R02","R03","R04")) { LocalReports.current?.let { LiveReportScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("H06","S03")) { LocalSteps.current?.let { LiveStepsScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id=="H07") { LocalConditions.current?.let { LiveConditionScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F13","F14") && mealModel!=null) {
@@ -234,7 +243,7 @@ private fun hasFooter(id:String)=id !in setOf("A01","H01","H02","H03","H05","H06
         Row(verticalAlignment=Alignment.CenterVertically) {
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                 if(id=="H01")Text("나만의 루틴로그",color=Muted,fontSize=11.sp)
-                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",ui.today().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else if(ui.accountMode)when(id){"R01"->"한 주의 루틴";"R09"->"지난 주 돌아보기";"W01"->"나의 운동";"W06"->"운동 정보·내 기록";"W08"->"운동 기록";"W09"->"세트 기록";"W10"->"세트 사이 휴식";"W14"->"날짜별 일정 변경";else->screen.title}else screen.title
+                val title=if(id=="H01")runCatching{LocalDate.parse(ui.get("home.date",ui.today().toString())).format(DateTimeFormatter.ofPattern("M월 d일"))}.getOrDefault("오늘")else if(id=="F01")"오늘 식단"else if(ui.accountMode)when(id){"R01"->"한 주의 루틴";"R05"->"다음 수행 초안";"R06"->"내 목표로 수정";"R09"->"지난 초안과 내 선택";"W01"->"나의 운동";"W06"->"운동 정보·내 기록";"W08"->"운동 기록";"W09"->"세트 기록";"W10"->"세트 사이 휴식";"W14"->"날짜별 일정 변경";else->screen.title}else screen.title
                 Text(title,style=if(root)MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,modifier=Modifier.semantics{heading()}.then(if(id=="H01")Modifier.clickable{ui.go("H03")}else Modifier))
                 if(root&&id=="H01")Text("나의 일상을 차곡차곡",fontSize=12.sp,color=Muted)
             }

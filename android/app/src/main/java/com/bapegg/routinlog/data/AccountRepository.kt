@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource {
+) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -161,6 +161,14 @@ class AccountRepository internal constructor(
         return "Bearer ${session.accessToken}"
     }
     override suspend fun weeklyReport(owner:String,week:String?)=authorized { api.weeklyReport(stepAuth(it,owner),week) }.required()
+    override suspend fun getReview(owner:String,week:String):WorkoutReviewDto? {
+        val response=authorized { api.getReview(stepAuth(it,owner),week) }
+        if(response.code()==404) { val error=response.error();if(error.code=="REVIEW_NOT_FOUND")return null;throw error }
+        return response.required()
+    }
+    override suspend fun prepareReview(owner:String,week:String,write:ReviewPrepare)=authorized { api.prepareReview(stepAuth(it,owner),week,write) }.required()
+    override suspend fun decideReview(owner:String,week:String,write:ReviewDecision)=authorized { api.decideReview(stepAuth(it,owner),week,write) }.required()
+    override suspend fun reviewHistory(owner:String)=authorized { api.reviewHistory(stepAuth(it,owner)) }.required().items
     override suspend fun stepConnection(owner:String)=authorized { api.stepConnection(stepAuth(it,owner)) }.required()
     override suspend fun connectSteps(owner:String,id:String)=authorized { api.connectSteps(stepAuth(it,owner),ConnectSteps(id)) }.required()
     override suspend fun disconnectSteps(owner:String,id:String) { authorized { api.disconnectSteps(stepAuth(it,owner),id) }.checkStatus() }
@@ -322,7 +330,7 @@ private fun malformed(): Nothing = throw AccountException(AccountErrorKind.SERVE
 private fun <T> Response<T>.required(): T { checkStatus(); return body() ?: malformed() }
 private fun Response<*>.checkStatus() { if (!isSuccessful) throw error() }
 private fun Response<*>.error(): AccountException {
-    val knownCodes = setOf("STEP_CONNECTION_CHANGED", "CONDITION_NOT_FOUND", "PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
+    val knownCodes = setOf("REVIEW_NOT_FOUND", "REVIEW_STALE", "REVIEW_NO_PLAN", "STEP_CONNECTION_CHANGED", "CONDITION_NOT_FOUND", "PROFILE_NOT_FOUND", "MEASUREMENT_NOT_FOUND", "FOOD_NOT_FOUND", "TEMPLATE_NOT_FOUND", "MEAL_NOT_FOUND", "EXERCISE_NOT_FOUND", "ROUTINE_NOT_FOUND", "SESSION_NOT_FOUND", "OVERRIDE_NOT_FOUND", "SESSION_EXISTS", "REPLACEMENT_REQUIRES_NEW_ENTRY", "PROFILE_REQUIRED", "RESOURCE_IN_USE", "AUTHENTICATION_REQUIRED", "VERSION_CONFLICT", "VALIDATION_ERROR", "INVALID_REQUEST", "AUTH_NOT_CONFIGURED", "AUTH_INVALID", "AUTH_CHALLENGE_INVALID", "AUTH_REAUTH_REQUIRED", "AUTH_ACCOUNT_MISMATCH", "AUTH_RETRY", "GOOGLE_NOT_CONFIGURED", "GOOGLE_AUTH_NOT_CONFIGURED", "AUTH_PROVIDER_NOT_CONFIGURED", "SESSION_EXPIRED", "INVALID_TOKEN", "INVALID_REFRESH_TOKEN", "INVALID_CHALLENGE", "CHALLENGE_EXPIRED")
     val serverCode = runCatching {
         errorBody()?.use { body ->
             val reader = body.charStream()
@@ -353,6 +361,8 @@ private fun Response<*>.error(): AccountException {
         AccountErrorKind.CREDENTIAL -> if (serverCode == "AUTH_ACCOUNT_MISMATCH") "현재 로그인한 Google 계정으로 다시 확인해주세요." else "본인 확인을 완료하지 못했어요. Google 계정으로 다시 확인해주세요."
         AccountErrorKind.VALIDATION -> if (serverCode == "PROFILE_REQUIRED") "내 기본 정보와 건강정보 동의를 완료한 뒤 기록해주세요." else "입력한 값과 필수 항목을 확인해주세요."
         AccountErrorKind.CONFLICT -> when (serverCode) {
+            "REVIEW_STALE" -> "기록·계획이나 적용 날짜가 달라졌어요. 새 기록으로 초안을 다시 만들어주세요."
+            "REVIEW_NO_PLAN" -> "날짜별 운동 계획과 세트 목표를 먼저 정해주세요."
             "RESOURCE_IN_USE" -> "다른 계획에서 사용 중이에요. 연결을 해제한 뒤 삭제해주세요."
             "SESSION_EXISTS" -> "이 날짜의 운동 기록이 이미 있어요. 다시 불러온 뒤 이어서 기록해주세요."
             "REPLACEMENT_REQUIRES_NEW_ENTRY" -> "완료한 세트는 기존 종목에 남기고, 대체 종목을 새로 추가해주세요."

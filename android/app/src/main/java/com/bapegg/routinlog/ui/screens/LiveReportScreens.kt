@@ -18,13 +18,14 @@ import java.util.Locale
 @Composable fun LiveReportScreens(id:String,ui:PreviewSession,model:ReportViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.owner) { if(state.owner!=null&&state.report==null&&!state.loading)model.refresh() }
+    val reviews=LocalWorkoutReviews.current
     val report=state.report
     if(state.loading) { UiCard { Text("한 주의 기록을 모으고 있어요.");LinearProgressIndicator(Modifier.fillMaxWidth(),color=DeepBlue) };return }
     if(state.error!=null) { UiCard { Text(state.error!!);UiButton("리포트 다시 불러오기",model::refresh) };return }
     if(report==null)return
     MutedText("${report.from} — ${report.to}${if(report.to!=report.weekEnd) " · 이번 주 진행 중" else " · 월~일"}")
     when(id) {
-        "R01","R09" -> {
+        "R01" -> {
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 UiButton("이전 주",{model.move(-1)},false,report.from>"1900-01-08",Modifier.weight(1f))
                 UiButton("다음 주",{model.move(1)},false,report.from<report.latestWeek,Modifier.weight(1f))
@@ -58,6 +59,10 @@ import java.util.Locale
                 BodyAverage("평균 허리둘레",report.waist,true)
             }
             MutedText("식사와 운동의 차이만으로 몸의 변화 원인을 확정할 수는 없어요. 몇 주의 흐름을 함께 살펴보세요.")
+            if(reviews!=null) {
+                UiButton("다음 수행 초안 확인",{reviews.open(report.from);ui.go("R05")})
+                UiButton("지난 초안과 내 선택",{ui.go("R09")},false)
+            }
             UiButton("최신 기록으로 새로고침",model::refresh,false)
         }
         "R02" -> NutritionReport(report)

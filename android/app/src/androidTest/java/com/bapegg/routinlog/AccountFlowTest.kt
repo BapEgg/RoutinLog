@@ -15,6 +15,7 @@ import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
 import com.bapegg.routinlog.ui.ReportViewModel
+import com.bapegg.routinlog.ui.WorkoutReviewViewModel
 import com.bapegg.routinlog.ui.StepsViewModel
 import com.bapegg.routinlog.steps.*
 import java.time.Instant
@@ -47,16 +48,18 @@ class AccountFlowTest {
     private var conditions: ConditionViewModel? = null
     private var steps: StepsViewModel? = null
     private var reports: ReportViewModel? = null
+    private var reviews: WorkoutReviewViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null, reviewFake: ReviewFixture? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
             val factory = viewModelFactory {
                 initializer { AccountViewModel(source) }
                 initializer { ReportViewModel(requireNotNull(reportFake)) }
+                initializer { WorkoutReviewViewModel(requireNotNull(reviewFake)) }
                 initializer { RoutineLogViewModel(SystemStatusRepository.create("", debug = true)) }
                 initializer { MealViewModel(requireNotNull(mealFake)) }
                 initializer { WorkoutViewModel(requireNotNull(workoutFake)) }
@@ -66,12 +69,13 @@ class AccountFlowTest {
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
             reports = if(reportFake==null)null else ViewModelProvider(compose.activity,factory)[ReportViewModel::class.java]
+            reviews = if(reviewFake==null)null else ViewModelProvider(compose.activity,factory)[WorkoutReviewViewModel::class.java]
             meals = if (mealFake == null) null else ViewModelProvider(compose.activity, factory)[MealViewModel::class.java]
             steps = if(stepFake==null)null else ViewModelProvider(compose.activity,factory)[StepsViewModel::class.java]
             conditions = if (conditionFake == null) null else ViewModelProvider(compose.activity, factory)[ConditionViewModel::class.java]
             workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports, reviewModel = reviews) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
         if(stepFake!=null)compose.waitUntil(5_000){steps?.state?.value?.let { it.loaded&&!it.busy }==true}
         if (conditionFake != null) compose.waitUntil(5_000) { conditions?.state?.value?.let { it.loaded && !it.loading } == true }
@@ -83,6 +87,64 @@ class AccountFlowTest {
             assertTrue(session().accountMode)
             assertFalse(session().previewMode)
         }
+    }
+
+    private fun openReview(fixture:ReviewFixture) {
+        start(reportFake=ReportFixture(),reviewFake=fixture)
+        compose.onNodeWithText("리포트",useUnmergedTree=true).performClick()
+        compose.waitUntil(5_000){reports?.state?.value?.report!=null}
+        compose.onNodeWithText("다음 수행 초안 확인").performScrollTo().performClick()
+        compose.onNodeWithText("운동 초안 만들기").performScrollTo().performClick()
+        compose.waitUntil(5_000){reviews?.state?.value?.review!=null}
+    }
+
+    @Test fun workoutReviewCustomEditRequiresConfirmationAndClearsOnSignOut() {
+        val fixture=ReviewFixture();openReview(fixture)
+        compose.onNodeWithText("목표 직접 수정").performScrollTo().performClick()
+        compose.onAllNodes(hasSetTextAction())[0].performScrollTo().performTextReplacement("75")
+        compose.onAllNodes(hasSetTextAction())[1].performScrollTo().performTextReplacement("9")
+        compose.onAllNodes(hasSetTextAction())[4].performScrollTo().performTextReplacement("이번에는 가볍게")
+        compose.onNodeWithText("수정한 목표 확인").performScrollTo().performClick()
+        compose.onNodeWithText("적용 전 비교").assertExists()
+        compose.runOnIdle { assertNull(fixture.command) }
+        compose.onNodeWithText("확인한 목표 적용").performScrollTo().performClick()
+        compose.waitUntil(5_000){reviews?.state?.value?.review?.status=="APPLIED"}
+        compose.onNodeWithText("적용 완료").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals("CUSTOM",fixture.command!!.choice)
+            assertEquals(0,BigDecimal("75").compareTo(fixture.command!!.targets.first().weightKg))
+            assertEquals(9,fixture.command!!.targets.first().reps)
+            assertEquals("이번에는 가볍게",fixture.command!!.reason)
+        }
+        capture("qa-live-workout-review.png")
+        compose.runOnIdle { source.expireFromAnotherFeature() }
+        compose.waitUntil(5_000){session().route=="A01"}
+        compose.runOnIdle { assertNull(reviews?.state?.value?.review);assertTrue(reviews!!.state.value.history.isEmpty()) }
+    }
+
+    @Test fun workoutReviewHoldKeepsChoiceInHistoryWithoutApplying() {
+        val fixture=ReviewFixture();openReview(fixture)
+        compose.onNodeWithText("이번에는 보류").performScrollTo().performClick()
+        compose.waitUntil(5_000){reviews?.state?.value?.history?.isNotEmpty()==true}
+        compose.onNodeWithText("지난 실제 수행치").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { assertEquals("HOLD",fixture.command!!.decision);assertEquals("HELD",reviews!!.state.value.history.first().status) }
+    }
+
+    private class ReviewFixture:WorkoutReviewDataSource {
+        var stored:WorkoutReviewDto?=null
+        var command:ReviewDecision?=null
+        override suspend fun getReview(owner:String,week:String)=stored
+        override suspend fun prepareReview(owner:String,week:String,write:ReviewPrepare):WorkoutReviewDto {
+            val planned=(1..2).map { ReviewTarget("set-$it",BigDecimal("100"),10) }
+            return WorkoutReviewDto(week,"2026-09-28","2026-09-30","하체 A",ExerciseSnapshot("exercise","스미스 머신 스쿼트","스미스 머신","대퇴사두","WEIGHT_REPS","MACHINE"),
+                planned,planned.map { it.copy(weightKg=BigDecimal("80"),reps=8) },"LAST_PERFORMANCE","GAIN",
+                "지난 실제 수행치를 다음 한 번의 후보로 확인해요.",listOf("계획 100 kg × 10회 → 실제 80 kg × 8회"),listOf("한 날짜의 한 종목에만 적용해요."),emptyList(),"workout-review-1","DRAFT",0).also { stored=it }
+        }
+        override suspend fun decideReview(owner:String,week:String,write:ReviewDecision):WorkoutReviewDto {
+            command=write
+            return stored!!.copy(status=if(write.decision=="HOLD")"HELD" else "APPLIED",version=1,choice=write.choice,chosen=write.targets,decisionReason=write.reason).also { stored=it }
+        }
+        override suspend fun reviewHistory(owner:String)=listOfNotNull(stored)
     }
 
     @Test fun liveWeeklyReportShowsRecordedNutritionAndNeverSampleSuggestions() {
