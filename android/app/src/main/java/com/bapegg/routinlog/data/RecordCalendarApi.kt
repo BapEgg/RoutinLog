@@ -8,9 +8,9 @@ import retrofit2.http.*
 @Keep data class RecordDay(val date: String, val mealsEaten: Int, val mealsSkipped: Int,
     val weightKg: BigDecimal?, val waistCm: BigDecimal?, val workoutStatus: String?, val workoutName: String?,
     val doneSets: Int, val skippedSets: Int, val pendingSets: Int, val workoutRecorded: Boolean,
-    val conditionRecorded: Boolean, val steps: Long?) {
+    val conditionRecorded: Boolean, val steps: Long?, val cardioMinutes: Int = 0, val cardioCount: Int = 0) {
     val categories: Int get() = listOf(mealsEaten + mealsSkipped > 0, weightKg != null || waistCm != null,
-        workoutRecorded, conditionRecorded, steps != null).count { it }
+        workoutRecorded || cardioCount > 0, conditionRecorded, steps != null).count { it }
     override fun toString() = "RecordDay(redacted)"
 }
 @Keep data class RecordCalendar(val month: String, val today: String, val timeZone: String, val days: List<RecordDay>) {

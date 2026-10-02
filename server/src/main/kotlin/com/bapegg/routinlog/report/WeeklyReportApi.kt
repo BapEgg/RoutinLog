@@ -2,6 +2,7 @@ package com.bapegg.routinlog.report
 
 import com.bapegg.routinlog.account.persistence.*
 import com.bapegg.routinlog.body.*
+import com.bapegg.routinlog.cardio.*
 import com.bapegg.routinlog.condition.*
 import com.bapegg.routinlog.food.*
 import com.bapegg.routinlog.steps.*
@@ -27,14 +28,14 @@ data class WeeklyReport(
     val from:LocalDate,val to:LocalDate,val weekEnd:LocalDate,val latestWeek:LocalDate,val timeZone:String,val generatedAt:Instant,
     val nutrition:List<ReportNutrient>,val mealDays:List<MealDayDto>,val workouts:List<WorkoutDayDto>,
     val body:List<BodyMeasurementDto>,val weight:ReportAverage,val waist:ReportAverage,
-    val conditions:List<ConditionDto>,val steps:List<StepDay>,
+    val conditions:List<ConditionDto>,val steps:List<StepDay>,val cardio:List<CardioDto> = emptyList(),
 ) { override fun toString()="WeeklyReport(redacted)" }
 class ReportException(val status:HttpStatus,val code:String,message:String):RuntimeException(message)
 
 /** One account lock gives a consistent read across feature stores. Reports contain observations, not causal diagnoses. */
 @Service @Transactional
 class WeeklyReportService(private val entities:EntityManager,private val meals:MealService,
-    private val workouts:WorkoutService,private val body:BodyMeasurementService,private val conditions:ConditionService,private val steps:StepsService) {
+    private val workouts:WorkoutService,private val body:BodyMeasurementService,private val conditions:ConditionService,private val steps:StepsService,private val cardio:CardioService) {
     fun get(userId:UUID,week:LocalDate?):WeeklyReport {
         val user=entities.find(UserAccountEntity::class.java,userId,LockModeType.PESSIMISTIC_WRITE)
         if(user==null||user.status!=AccountStatus.ACTIVE)throw ReportException(HttpStatus.UNAUTHORIZED,"AUTHENTICATION_REQUIRED","다시 로그인해주세요.")
@@ -49,7 +50,7 @@ class WeeklyReportService(private val entities:EntityManager,private val meals:M
         val current=measurements.filter { it.date>=from };val previous=measurements.filter { it.date<from }
         return WeeklyReport(from,to,from.plusDays(6),latest,user.timeZone,Instant.now(),nutrition(days),days,
             workouts.days(userId,from,to).items,current,average(current,previous){it.weightKg},average(current,previous){it.waistCm},
-            conditions.list(userId,from,to).items,steps.days(userId,from,to).items)
+            conditions.list(userId,from,to).items,steps.days(userId,from,to).items,cardio.list(userId,from,to).items)
     }
     internal fun nutrition(days:List<MealDayDto>):List<ReportNutrient> {
         // Recalculate across original snapshots once, avoiding a sum of rounded daily totals.

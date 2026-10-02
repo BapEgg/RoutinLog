@@ -9,7 +9,7 @@ import retrofit2.http.*
 @Keep data class ReportAverage(val value:BigDecimal?,val count:Int,val previous:BigDecimal?,val previousCount:Int,val change:BigDecimal?)
 @Keep data class WeeklyReport(val from:String,val to:String,val weekEnd:String,val latestWeek:String,val timeZone:String,val generatedAt:String,
     val nutrition:List<ReportNutrient>,val mealDays:List<MealDayDto>,val workouts:List<WorkoutDayDto>,val body:List<BodyMeasurementDto>,
-    val weight:ReportAverage,val waist:ReportAverage,val conditions:List<ConditionDto>,val steps:List<StepDay>) {
+    val weight:ReportAverage,val waist:ReportAverage,val conditions:List<ConditionDto>,val steps:List<StepDay>,val cardio:List<CardioDto> = emptyList()) {
     override fun toString()="WeeklyReport(redacted)"
 }
 interface ReportDataSource { suspend fun weeklyReport(owner:String,week:String?):WeeklyReport }

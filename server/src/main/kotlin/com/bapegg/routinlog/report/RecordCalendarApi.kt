@@ -23,7 +23,7 @@ import java.util.UUID
 data class RecordDay(val date: LocalDate, val mealsEaten: Int, val mealsSkipped: Int,
     val weightKg: BigDecimal?, val waistCm: BigDecimal?, val workoutStatus: WorkoutStatus?, val workoutName: String?,
     val doneSets: Int, val skippedSets: Int, val pendingSets: Int, val workoutRecorded: Boolean,
-    val conditionRecorded: Boolean, val steps: Long?) {
+    val conditionRecorded: Boolean, val steps: Long?, val cardioMinutes: Int = 0, val cardioCount: Int = 0) {
     override fun toString() = "RecordDay(redacted)"
 }
 data class RecordCalendar(val month: LocalDate, val today: LocalDate, val timeZone: String, val days: List<RecordDay>) {
@@ -52,6 +52,8 @@ class RecordCalendarService(private val entities: EntityManager, private val jdb
         // Only one bounded session query; calendar browsing does not deserialize foods or resolve each day's plan.
         val workouts = jdbc.query("SELECT payload FROM workout_sessions WHERE user_id=? AND workout_date BETWEEN ? AND ?",
             { rs, _ -> json.readValue(rs.getString("payload"), WorkoutSessionDto::class.java) }, owner, from, to).associateBy { it.date }
+        val cardio = jdbc.query("SELECT recorded_on,payload FROM cardio_records WHERE user_id=? AND recorded_on BETWEEN ? AND ?",
+            { rs, _ -> json.readValue(rs.getString("payload"), com.bapegg.routinlog.cardio.CardioDto::class.java) }, owner, from, to).groupBy { it.date }
         val days = from.datesUntil(to.plusDays(1)).map { date ->
             val measurement = measurements[date]
             val session = workouts[date]
@@ -63,7 +65,7 @@ class RecordCalendarService(private val entities: EntityManager, private val jdb
             RecordDay(date, meals[date]?.firstOrNull { it.second == "EATEN" }?.third ?: 0,
                 meals[date]?.firstOrNull { it.second == "SKIPPED" }?.third ?: 0,
                 measurement?.weightKg, measurement?.waistCm, session?.status, session?.planned?.routineName,
-                done, skipped, sets.count { it.status == SetStatus.PENDING }, recorded, date in feelings, walking[date]?.steps)
+                done, skipped, sets.count { it.status == SetStatus.PENDING }, recorded, date in feelings, walking[date]?.steps, cardio[date].orEmpty().sumOf { it.values.minutes }, cardio[date].orEmpty().size)
         }.toList()
         return RecordCalendar(from, today, user.timeZone, days)
     }

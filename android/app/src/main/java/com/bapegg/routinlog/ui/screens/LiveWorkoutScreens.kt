@@ -94,6 +94,7 @@ private fun LiveWorkoutWeek(ui: PreviewSession, model: WorkoutViewModel, state: 
     UiButton(when { state.session?.status == "COMPLETED" -> "운동 기록 보기"; state.session != null -> "운동 이어서 기록"; state.day?.planned != null -> "이날 운동 시작"; else -> "자유 운동 기록 시작" },
         { model.startSession { ui.go("W08") } }, enabled = !future)
     if (future) MutedText("앞으로의 일정은 바꿀 수 있어요. 수행 기록은 해당 날짜부터 남겨요.")
+    UiButton("유산소 기록", { ui.set("cardio.date",state.date);ui.go("W15") }, primary = false, enabled = !future)
     UiButton("이 날짜의 루틴 변경", { ui.go("W14") }, primary = false)
     SectionTitle("이번 주 일정")
     UiCard {
@@ -323,6 +324,7 @@ private fun LiveWorkoutSession(ui: PreviewSession, model: WorkoutViewModel, stat
         planned.entries.forEach { entry -> KeyValue(entry.exercise.name, "${entry.sets.size}세트 · ${entry.exercise.target.ifBlank { "부위 미입력" }}") }
         MutedText("운동을 바꾸거나 일부만 수행해도 원래 계획은 남아요.")
     } }
+    UiButton("유산소 기록", { ui.set("cardio.date",state.date);ui.go("W15") }, primary = false)
     UiButton(if (session.status == "COMPLETED") "마무리 기록 확인" else "오늘 운동 마무리", { ui.go("W16") })
     TextButton(onClick = { deleting = true }) { Text("이날 운동 기록 삭제", color = MaterialTheme.colorScheme.error) }
     if (deleting) WorkoutConfirm("이날 운동 기록을 삭제할까요?", "세트와 수행 메모를 삭제해요. 저장한 루틴과 기본 일정은 유지돼요.", "기록 삭제", { deleting = false }) {

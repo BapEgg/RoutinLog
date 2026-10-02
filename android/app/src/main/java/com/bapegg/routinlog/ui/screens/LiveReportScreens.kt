@@ -33,7 +33,7 @@ import java.util.Locale
             }
             if(report.from!=report.latestWeek)UiButton("이번 주 기록 보기",{model.select(report.latestWeek)},false)
             UiCard {
-                val hasRecords=report.mealDays.any { it.items.isNotEmpty() }||report.body.isNotEmpty()||report.steps.isNotEmpty()||report.conditions.isNotEmpty()||report.workouts.any { it.session!=null }
+                val hasRecords=report.cardio.isNotEmpty()||report.mealDays.any { it.items.isNotEmpty() }||report.body.isNotEmpty()||report.steps.isNotEmpty()||report.conditions.isNotEmpty()||report.workouts.any { it.session!=null }
                 SectionTitle(if(hasRecords)"기록이 모여 한 주가 되었어요" else "아직 모인 기록이 없어요")
                 KeyValue("식사 기록이 있는 날","${report.mealDays.count { it.items.isNotEmpty() }} / ${report.mealDays.size}일")
                 KeyValue("체중 · 허리 측정","${report.weight.count}회 · ${report.waist.count}회")
@@ -51,6 +51,7 @@ import java.util.Locale
                 SectionTitle("계획과 실제 운동","상세",{ui.go("R03")})
                 KeyValue("날짜별 계획","${report.workouts.count { plan(it)!=null }}일")
                 KeyValue("수행한 세트가 있는 날","${report.workouts.count { d->d.session?.entries?.any { e->e.sets.any { it.status=="DONE" } }==true }}일")
+                KeyValue("유산소 기록", "${report.cardio.size}회 · ${report.cardio.sumOf { it.values.minutes }}분")
                 KeyValue("완료한 세트","${report.workouts.sumOf { d->d.session?.entries?.sumOf { e->e.sets.count { it.status=="DONE" } } ?: 0 }}세트")
                 MutedText("세트 수에는 워밍업이 포함돼요. 종목이 달라지면 같은 운동량으로 보지 않아요.")
             }
@@ -113,6 +114,7 @@ import java.util.Locale
 private fun plan(day:WorkoutDayDto)=if(day.session!=null)day.session.planned else day.planned
 @Composable private fun WorkoutReport(report:WeeklyReport) {
     val units=LocalAccount.current.state.profile?.units ?: "METRIC"
+    CardioReport(report.cardio)
     report.workouts.forEach { day ->
         var open by remember(report.from,day.date) { mutableStateOf(false) }
         val baseline=plan(day)

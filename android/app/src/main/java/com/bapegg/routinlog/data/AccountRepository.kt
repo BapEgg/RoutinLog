@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
+) : CardioDataSource, AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -184,6 +184,10 @@ class AccountRepository internal constructor(
     override suspend fun disconnectSteps(owner:String,id:String) { authorized { api.disconnectSteps(stepAuth(it,owner),id) }.checkStatus() }
     override suspend fun saveSteps(owner:String,id:String,batch:StepBatch) { authorized { api.saveSteps(stepAuth(it,owner),id,batch) }.checkStatus() }
     override suspend fun listSteps(owner:String,from:String,to:String)=authorized { api.listSteps(stepAuth(it,owner),from,to) }.required().items
+
+    override suspend fun listCardio(owner:String,from:String,to:String)=authorized { api.listCardio(stepAuth(it,owner),from,to) }.required().items
+    override suspend fun saveCardio(owner:String,id:String,write:CardioWrite)=authorized { api.saveCardio(stepAuth(it,owner),id,write) }.required()
+    override suspend fun deleteCardio(owner:String,id:String,version:Long) { authorized { api.deleteCardio(stepAuth(it,owner),id,version) }.checkStatus() }
 
     override suspend fun listConditions(from:String,to:String):List<ConditionDto> = authorized { api.listConditions("Bearer ${it.accessToken}",from,to) }.required().items
     override suspend fun saveCondition(date:String,write:ConditionWrite):ConditionDto = authorized { api.saveCondition("Bearer ${it.accessToken}",date,write) }.required()

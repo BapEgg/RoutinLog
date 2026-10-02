@@ -42,7 +42,7 @@ import com.bapegg.routinlog.data.BodyMeasurementWriteDto
 import com.bapegg.routinlog.domain.BodyMeasurementInput
 import java.math.RoundingMode
 
-@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null,reportModel:ReportViewModel?=null,reviewModel:WorkoutReviewViewModel?=null,mealReviewModel:MealReviewViewModel?=null,calendarModel:RecordCalendarViewModel?=null) {
+@Composable fun RoutineLogApp(model:RoutineLogViewModel,initialRoute:String?=null,accountModel:AccountViewModel?=null,mealModel:MealViewModel?=null,workoutModel:WorkoutViewModel?=null,conditionModel:ConditionViewModel?=null,stepsModel:StepsViewModel?=null,reportModel:ReportViewModel?=null,reviewModel:WorkoutReviewViewModel?=null,mealReviewModel:MealReviewViewModel?=null,calendarModel:RecordCalendarViewModel?=null,cardioModel:CardioViewModel?=null) {
     val ui:PreviewSession=viewModel()
     val accountState = accountModel?.state?.collectAsStateWithLifecycle()?.value ?: AccountUiState(initializing=false)
     LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
@@ -81,6 +81,9 @@ import java.math.RoundingMode
             delay(1000)
             while(true){stepsModel?.refresh();delay(60_000)}
         }
+    }
+    LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
+        cardioModel?.bind(accountState.userId.takeIf { accountState.ready && accountState.profile!=null },accountState.profile?.timeZone)
     }
     val conditionState = conditionModel?.state?.collectAsStateWithLifecycle()?.value
     LaunchedEffect(accountState.userId,accountState.ready,accountState.profile?.timeZone) {
@@ -160,7 +163,7 @@ import java.math.RoundingMode
             (current as? android.app.Activity)?.let{activity->accountModel?.deleteAccount(activity){ui.reset();ui.notify("계정과 저장된 기록을 삭제했어요.")}}
         },
     )
-    CompositionLocalProvider(LocalRecordCalendar provides calendarModel,LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel,LocalReports provides reportModel,LocalWorkoutReviews provides reviewModel,LocalMealReviews provides mealReviewModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
+    CompositionLocalProvider(LocalCardio provides cardioModel,LocalRecordCalendar provides calendarModel,LocalAccount provides actions,LocalSteps provides stepsModel,LocalConditions provides conditionModel,LocalReports provides reportModel,LocalWorkoutReviews provides reviewModel,LocalMealReviews provides mealReviewModel) { RoutineLogContent(model,initialRoute,ui,mealModel,workoutModel) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -228,6 +231,7 @@ import java.math.RoundingMode
     if(ui.accountMode && id in setOf("R05","R06","R07","R08","R09","R11")) { LocalWorkoutReviews.current?.let { LiveWorkoutReviewScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("R01","R02","R03","R04")) { LocalReports.current?.let { LiveReportScreens(id,ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("H06","S03")) { LocalSteps.current?.let { LiveStepsScreen(ui,it) } ?: LiveFeaturePending(ui);return }
+    if(ui.accountMode && id=="W15") { LocalCardio.current?.let { LiveCardioScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id=="H07") { LocalConditions.current?.let { LiveConditionScreen(ui,it) } ?: LiveFeaturePending(ui);return }
     if(ui.accountMode && id in setOf("F01","F02","F03","F04","F06","F07","F08","F09","F10","F11","F12","F13","F14") && mealModel!=null) {
         LiveFoodScreens(id,ui,mealModel);return

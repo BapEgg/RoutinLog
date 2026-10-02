@@ -150,6 +150,11 @@ import java.util.Locale
         UiButton(if (day.workoutStatus == "IN_PROGRESS") "운동 기록 이어가기" else "운동 기록 보기", onWorkout, enabled = !working)
     }
     UiCard {
+        SectionTitle("유산소")
+        KeyValue("이날 기록", if(day.cardioCount>0) "${day.cardioCount}회 · ${day.cardioMinutes}분" else "미기록")
+        UiButton("유산소 기록 보기", { ui.set("cardio.date",day.date);ui.go("W15") }, primary=false)
+    }
+    UiCard {
         SectionTitle("식사 기록")
         if (day.mealsEaten + day.mealsSkipped == 0) BodyText("아직 확인한 식사가 없어요.")
         else {

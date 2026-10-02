@@ -53,4 +53,23 @@ class ReportRepositoryTest {
         try { repo.recordCalendar("another-user","2026-09-01");fail("Owner must match") }catch(e:AccountException){assertEquals(AccountErrorKind.CANCELLED,e.kind)}
         assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
     }
+    @Test fun `cardio sends versioned device observations with owner authorization`()=runBlocking {
+        server.enqueue(json("""{"id":"entry","date":"2026-10-01","version":2,"values":{"activity":"bike","minutes":30,"deviceKcal":0,"energyKind":"UNKNOWN","deviceName":"bike display"}}"""))
+        val saved=repo.saveCardio("test-user","entry",CardioWrite("2026-10-01",CardioValues("bike",30,java.math.BigDecimal.ZERO,"UNKNOWN","bike display"),1))
+        val sent=server.takeRequest();assertEquals("PUT",sent.method);assertEquals("/api/v1/cardio/entry",sent.path)
+        assertEquals("Bearer test-current",sent.getHeader("Authorization"))
+        val body=JsonParser.parseString(sent.body.readUtf8()).asJsonObject
+        assertEquals(1,body["version"].asInt);assertEquals("UNKNOWN",body["values"].asJsonObject["energyKind"].asString)
+        assertNull(saved.values.speedKmh);assertEquals(0,saved.values.deviceKcal!!.signum())
+        server.enqueue(MockResponse().setResponseCode(204));repo.deleteCardio("test-user","entry",2)
+        assertEquals("/api/v1/cardio/entry?version=2",server.takeRequest().path)
+    }
+    @Test fun `all cardio requests reject a stale owner before any network call`()=runBlocking {
+        val actions:List<suspend ()->Unit> = listOf(
+            {repo.listCardio("other","2026-10-01","2026-10-01");Unit},
+            {repo.saveCardio("other","entry",CardioWrite("2026-10-01",CardioValues("bike",20)));Unit},
+            {repo.deleteCardio("other","entry",0)})
+        actions.forEach { action->try{action();fail("owner mismatch")}catch(e:AccountException){assertEquals(AccountErrorKind.CANCELLED,e.kind)} }
+        assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
+    }
 }
