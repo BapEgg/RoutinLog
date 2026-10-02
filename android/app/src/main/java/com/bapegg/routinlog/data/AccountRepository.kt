@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : CardioDataSource, AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
+) : ExerciseCatalogDataSource, CardioDataSource, AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -228,6 +228,8 @@ class AccountRepository internal constructor(
         authorized { api.deleteMeal("Bearer ${it.accessToken}", id, version) }.checkStatus()
     }
 
+    override suspend fun exerciseCatalog(owner:String)=authorized { api.exerciseCatalog(stepAuth(it,owner)) }.required()
+    override suspend fun importCatalogExercise(owner:String,key:String)=authorized { api.importCatalogExercise(stepAuth(it,owner),key) }.required()
     override suspend fun listExercises(): List<ExerciseDto> = authorized { api.listExercises("Bearer ${it.accessToken}") }.required().items
     override suspend fun saveExercise(id: String, exercise: ExerciseWrite): ExerciseDto = authorized { api.saveExercise("Bearer ${it.accessToken}", id, exercise) }.required()
     override suspend fun deleteExercise(id: String, version: Long) { authorized { api.deleteExercise("Bearer ${it.accessToken}", id, version) }.checkStatus() }

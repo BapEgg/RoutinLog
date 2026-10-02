@@ -64,6 +64,45 @@ class WorkoutFlowTest @Autowired constructor(
     private fun putJson(path:String,user:UUID,body:Any)=mvc.perform(put(path).with(auth(user)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
     private fun day(user:UUID,date:LocalDate=today)=workouts.days(user,date,date).items.single()
 
+    @Test fun `catalog requires authentication and importing requires consent`() {
+        mvc.perform(get("/api/v1/workout-catalog")).andExpect(status().isUnauthorized)
+        mvc.perform(post("/api/v1/workout-catalog/leg-press/save")).andExpect(status().isUnauthorized)
+        val u=user(false)
+        mvc.perform(get("/api/v1/workout-catalog").with(auth(u))).andExpect(status().isOk).andExpect(header().string("Cache-Control","no-store"))
+        mvc.perform(post("/api/v1/workout-catalog/leg-press/save").with(auth(u))).andExpect(status().isForbidden)
+        assertTrue(workouts.exercises(u).items.isEmpty())
+    }
+    @Test fun `catalog import is idempotent and does not replace user edits`() {
+        val u=user();val first=workouts.importCatalog(u,"leg-press")
+        assertEquals(first,workouts.importCatalog(u,"leg-press"))
+        assertEquals(1,workouts.exercises(u).items.size)
+        val edited=workouts.putExercise(u,UUID.fromString(first.id),ExerciseWrite("우리 헬스장 레그프레스","머신 2번","내 타겟",RecordType.WEIGHT_REPS,LoadConvention.MACHINE,first.version))
+        assertEquals(edited,workouts.importCatalog(u,"leg-press"))
+        assertTrue(workouts.routines(u).items.isEmpty());assertTrue(workouts.plan(u).slots.all { it.routineId==null })
+        assertEquals(0,workouts.catalog(u).items.count { it.name==edited.name })
+    }
+    @Test fun `catalog copies are owner isolated and remain usable in saved routines`() {
+        val a=user();val b=user();val ea=workouts.importCatalog(a,"dumbbell-bench");val eb=workouts.importCatalog(b,"dumbbell-bench")
+        val routine=workouts.putRoutine(a,UUID.randomUUID(),RoutineWrite("가슴",listOf(RoutineEntry(id(),ea.id,listOf(PlannedSet(id()))))))
+        assertEquals(LoadConvention.PER_HAND,ea.loadConvention)
+        workouts.putExercise(a,UUID.fromString(ea.id),ExerciseWrite("내 덤벨 운동",ea.equipment,ea.target,ea.recordType,LoadConvention.TOTAL,ea.version))
+        assertEquals(eb,workouts.importCatalog(b,"dumbbell-bench"))
+        assertEquals(ea.id,routine.entries.single().exerciseId)
+        assertEquals(RecordType.DURATION,workouts.importCatalog(a,"plank").recordType)
+        assertEquals(RecordType.REPS,workouts.importCatalog(a,"push-up").recordType)
+    }
+    @Test fun `unknown catalog keys never create records and deleting permits clean reimport`() {
+        val u=user()
+        mvc.perform(post("/api/v1/workout-catalog/unknown/save").with(auth(u))).andExpect(status().isNotFound)
+        assertTrue(workouts.exercises(u).items.isEmpty())
+        val saved=workouts.importCatalog(u,"leg-press")
+        workouts.deleteExercise(u,UUID.fromString(saved.id),saved.version)
+        assertEquals(saved,workouts.importCatalog(u,"leg-press"))
+        val catalog=workouts.catalog(u)
+        assertEquals(catalog.items.size,catalog.items.map { it.key }.toSet().size)
+        assertEquals(catalog.items.size,catalog.items.map { ExerciseCatalog.importedId(it.key) }.toSet().size)
+    }
+
     @Test fun `all workout endpoints require the authenticated account and writes require health consent`() {
         listOf("/workout-exercises","/workout-routines","/workout-plan","/workout-days?from=$today&to=$today","/workout-history?exerciseId=${id()}&before=$today").forEach {
             mvc.perform(get("/api/v1$it")).andExpect(status().isUnauthorized)

@@ -15,6 +15,7 @@ import java.time.ZoneId
 import java.util.UUID
 
 data class WorkoutUiState(
+    val catalog: ExerciseCatalogDto? = null, val catalogLoading: Boolean = false, val catalogError: String? = null,
     val userId: String? = null, val units: String = "METRIC", val loading: Boolean = false,
     val busy: Boolean = false, val loaded: Boolean = false, val date: String = LocalDate.now().toString(),
     val exercises: List<ExerciseDto> = emptyList(), val routines: List<RoutineDto> = emptyList(),
@@ -50,6 +51,8 @@ class WorkoutViewModel(private val repository: WorkoutDataSource,
     private var readJob: Job? = null
     private var writeJob: Job? = null
     private var historyJob: Job? = null
+    private var catalogJob: Job? = null
+    private var catalogGeneration = 0L
     private val startIds = mutableMapOf<String, String>()
 
     fun bind(userId: String?, timeZone: String? = null, units: String = "METRIC") {
@@ -61,7 +64,7 @@ class WorkoutViewModel(private val repository: WorkoutDataSource,
             if (zoneChanged && userId != null) refresh()
             return
         }
-        generation++; historyGeneration++
+        generation++; historyGeneration++; catalogGeneration++; catalogJob?.cancel()
         readJob?.cancel(); writeJob?.cancel(); historyJob?.cancel(); startIds.clear()
         mutableState.value = WorkoutUiState(userId = userId, units = units, date = LocalDate.now(zone).toString())
         if (userId != null) refresh()
@@ -163,6 +166,31 @@ class WorkoutViewModel(private val repository: WorkoutDataSource,
         mutableState.update { it.copy(routines = it.routines.filterNot { row -> row.id == routine.id },
             routineDraft = it.routineDraft?.takeUnless { draft -> draft.id == routine.id }, notice = "루틴을 삭제했어요. 지난 기록은 유지돼요.") }
         onDeleted()
+    }
+    fun loadCatalog(force:Boolean=false) {
+        val source=repository as? ExerciseCatalogDataSource ?: return
+        val owner=state.value.userId ?: return
+        if(state.value.catalogLoading||(!force&&state.value.catalog!=null))return
+        val epoch=++catalogGeneration
+        catalogJob?.cancel();mutableState.update { it.copy(catalogLoading=true,catalogError=null) }
+        catalogJob=viewModelScope.launch {
+            try {
+                val result=confirmed { source.exerciseCatalog(owner) }
+                if(epoch==catalogGeneration)mutableState.update { it.copy(catalog=result) }
+            }catch(e:CancellationException){throw e}catch(e:Exception){
+                if(epoch==catalogGeneration)mutableState.update { it.copy(catalogError=if(e is AccountException)e.userMessage else "기본 운동 목록을 불러오지 못했어요. 다시 시도해주세요.") }
+            }finally{if(epoch==catalogGeneration)mutableState.update { it.copy(catalogLoading=false) }}
+        }
+    }
+    fun importCatalog(key:String,onSaved:(ExerciseDto)->Unit) {
+        val source=repository as? ExerciseCatalogDataSource ?: return
+        val owner=state.value.userId ?: return
+        if(state.value.catalog?.items?.none { it.key==key } != false)return
+        mutate {
+            val saved=confirmed { source.importCatalogExercise(owner,key) }
+            mutableState.update { it.copy(exercises=it.exercises.filterNot { row->row.id==saved.id }+saved,notice="내 운동에서 확인할 수 있어요.") }
+            onSaved(saved)
+        }
     }
     fun saveExercise(id: String, write: ExerciseWrite, onSaved: () -> Unit) = mutate {
         val saved = confirmed { repository.saveExercise(id, write) }

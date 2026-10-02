@@ -30,6 +30,38 @@ class WorkoutViewModelTest {
         Dispatchers.resetMain()
     }
 
+    @Test fun `catalog is lazy cached searchable and import preserves draft without inventing targets`()=runTest(dispatcher) {
+        load();viewModel.beginRoutine();viewModel.setRoutineName("내 초안")
+        assertTrue(repository.catalogOwners.isEmpty())
+        viewModel.loadCatalog();advanceUntilIdle();viewModel.loadCatalog();advanceUntilIdle()
+        assertEquals(listOf("account-a"),repository.catalogOwners)
+        assertTrue(catalogItem.matches("db PRESS","가슴"));assertTrue(catalogItem.matches("덤벨프레스","전체"));assertFalse(catalogItem.matches("press","하체"))
+        var saved:ExerciseDto?=null
+        viewModel.importCatalog("basic"){saved=it};advanceUntilIdle()
+        assertEquals(repository.imported,saved);assertEquals("내 초안",viewModel.state.value.routineDraft?.name)
+        viewModel.addRoutineExercise(saved!!.id)
+        val set=viewModel.state.value.routineDraft!!.entries.single().sets.single()
+        assertEquals("",set.weight);assertEquals("",set.reps)
+        viewModel.importCatalog("basic"){};advanceUntilIdle();assertEquals(1,viewModel.state.value.exercises.count { it.id==saved!!.id })
+    }
+    @Test fun `catalog load and import failures keep personal data and allow retry`()=runTest(dispatcher) {
+        load();repository.catalogFailure=failure();viewModel.loadCatalog();advanceUntilIdle()
+        assertNotNull(viewModel.state.value.catalogError);assertEquals(2,viewModel.state.value.exercises.size)
+        repository.catalogFailure=null;viewModel.loadCatalog(true);advanceUntilIdle();assertNull(viewModel.state.value.catalogError)
+        repository.catalogFailure=failure();viewModel.importCatalog("basic"){fail("should not navigate")};advanceUntilIdle()
+        assertNotNull(viewModel.state.value.error);assertEquals(2,viewModel.state.value.exercises.size)
+        repository.catalogFailure=null;viewModel.importCatalog("basic"){};advanceUntilIdle();assertEquals(3,viewModel.state.value.exercises.size)
+    }
+    @Test fun `late catalog and import responses cannot refill another account`()=runTest(dispatcher) {
+        load();repository.catalogGate=CompletableDeferred();viewModel.loadCatalog();runCurrent()
+        viewModel.bind(null);repository.catalogGate!!.complete(ExerciseCatalogDto("old","old","https://example.com",listOf(catalogItem)));advanceUntilIdle()
+        assertNull(viewModel.state.value.catalog);assertFalse(viewModel.state.value.catalogLoading)
+        repository.catalogGate=null;load();viewModel.loadCatalog();advanceUntilIdle()
+        repository.importGate=CompletableDeferred();viewModel.importCatalog("basic"){fail("late navigation")};runCurrent()
+        viewModel.bind(null);repository.importGate!!.complete(repository.imported);advanceUntilIdle()
+        assertTrue(viewModel.state.value.exercises.isEmpty());assertNull(viewModel.state.value.catalog)
+    }
+
     @Test fun `old account read cannot refill a new account after cancellation`() = runTest(dispatcher) {
         val pending = CompletableDeferred<List<WorkoutDayDto>>()
         repository.nextDaysGate = pending
@@ -419,7 +451,23 @@ class WorkoutViewModelTest {
         version = version, startedAt = "2026-10-01T01:00:00Z", finishedAt = if (status == "COMPLETED") "2026-10-01T02:00:00Z" else null)
 
     /** Explicit test-only responses. Production authorization and validation are tested separately. */
-    private inner class FakeWorkouts : WorkoutDataSource {
+    private val catalogItem=CatalogExercise("basic","기본 덤벨 프레스","덤벨","가슴","가슴","WEIGHT_REPS","PER_HAND",listOf("DB press"),"한 손 중량")
+    private inner class FakeWorkouts : WorkoutDataSource, ExerciseCatalogDataSource {
+        var catalogFailure:AccountException?=null
+        var catalogGate:CompletableDeferred<ExerciseCatalogDto>?=null
+        var importGate:CompletableDeferred<ExerciseDto>?=null
+        var imported=exerciseB.copy(id="catalog-copy",loadConvention="PER_HAND")
+        val catalogOwners=mutableListOf<String>()
+        override suspend fun exerciseCatalog(owner:String):ExerciseCatalogDto {
+            catalogOwners+=owner;catalogFailure?.let { throw it }
+            catalogGate?.let { return withContext(NonCancellable){it.await()} }
+            return ExerciseCatalogDto("test","test source","https://example.com",listOf(catalogItem))
+        }
+        override suspend fun importCatalogExercise(owner:String,key:String):ExerciseDto {
+            catalogFailure?.let { throw it }
+            importGate?.let { return withContext(NonCancellable){it.await()} }
+            return imported
+        }
         var exercises = listOf(exerciseA, exerciseB)
         var routines = listOf(routine())
         val sessions = mutableMapOf<String, WorkoutSessionDto>()

@@ -49,6 +49,8 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
                     .requestMatchers(HttpMethod.GET, "/api/v1/cardio").access(::accountAccess)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/cardio/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/cardio/*").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/workout-catalog").access(::accountAccess)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/workout-catalog/*/save").access(::accountAccess)
                     .anyRequest().denyAll()
             }
             .formLogin { it.disable() }

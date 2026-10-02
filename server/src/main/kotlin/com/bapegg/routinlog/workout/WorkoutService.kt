@@ -23,6 +23,15 @@ import java.util.UUID
 @Service
 @Transactional
 class WorkoutService(private val jdbc:JdbcTemplate,private val entities:EntityManager,private val profiles:UserProfileRepository,private val json:ObjectMapper) {
+    fun catalog(userId:UUID):ExerciseCatalogDto { account(userId);return ExerciseCatalog.dto() }
+    fun importCatalog(userId:UUID,key:String):ExerciseDto {
+        account(userId,true)
+        val definition=ExerciseCatalog.items.firstOrNull { it.key==key } ?: missing("CATALOG_EXERCISE_NOT_FOUND")
+        val id=ExerciseCatalog.importedId(key)
+        // Repeated taps/lost responses must reuse the user's copy, including any subsequent edits.
+        exercise(userId,id)?.let { return it }
+        return putExercise(userId,id,ExerciseWrite(definition.name,definition.equipment,definition.target,definition.recordType,definition.loadConvention))
+    }
     fun exercises(userId:UUID):ExerciseListDto {
         account(userId)
         return ExerciseListDto(jdbc.query("SELECT * FROM workout_exercises WHERE user_id=? ORDER BY name,id",exerciseMapper,userId))

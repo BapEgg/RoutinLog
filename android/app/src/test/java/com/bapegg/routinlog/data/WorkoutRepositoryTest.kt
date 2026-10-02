@@ -39,6 +39,18 @@ class WorkoutRepositoryTest {
     }
     @After fun tearDown() { server.shutdown() }
 
+    @Test fun `catalog requests bind the original account and import returns an editable exercise`()=runBlocking {
+        server.enqueue(json("""{"revision":"test","sourceName":"NASM","sourceUrl":"https://www.nasm.org/resource-center/exercise-library","items":[]}"""))
+        assertTrue(repository.exerciseCatalog("fake-user").items.isEmpty())
+        assertEquals("/api/v1/workout-catalog",take().path)
+        server.enqueue(json(exerciseJson));assertEquals("PER_HAND",repository.importCatalogExercise("fake-user","dumbbell-bench").loadConvention)
+        val sent=take();assertEquals("POST",sent.method);assertEquals("/api/v1/workout-catalog/dumbbell-bench/save",sent.path)
+        assertEquals("Bearer fake-access-1",sent.getHeader("Authorization"))
+        assertEquals(AccountErrorKind.CANCELLED,failure { repository.exerciseCatalog("other") }.kind)
+        assertEquals(AccountErrorKind.CANCELLED,failure { repository.importCatalogExercise("other","dumbbell-bench") }.kind)
+        assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
+    }
+
     @Test fun `exercise library uses owner-authenticated requests and explicit load convention`() = runBlocking {
         server.enqueue(json("""{"items":[$exerciseJson]}"""))
         val exercise = repository.listExercises().single()

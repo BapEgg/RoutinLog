@@ -16,6 +16,10 @@ import java.time.LocalDate
 @RestController
 @RequestMapping("/api/v1")
 class WorkoutController(private val workouts:WorkoutService) {
+    @GetMapping("/workout-catalog")
+    fun catalog(@AuthenticationPrincipal user:AuthenticatedUser)=privateResponse(workouts.catalog(user.userId))
+    @PostMapping("/workout-catalog/{key}/save")
+    fun importCatalog(@AuthenticationPrincipal user:AuthenticatedUser,@PathVariable key:String)=privateResponse(workouts.importCatalog(user.userId,key))
     @GetMapping("/workout-exercises")
     fun exercises(@AuthenticationPrincipal user:AuthenticatedUser)=privateResponse(workouts.exercises(user.userId))
     @PutMapping("/workout-exercises/{id}")

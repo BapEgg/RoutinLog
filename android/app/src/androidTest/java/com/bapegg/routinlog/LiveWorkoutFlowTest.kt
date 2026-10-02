@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -66,6 +67,31 @@ class LiveWorkoutFlowTest {
     private fun enter(label: String, text: String) = compose.onNodeWithContentDescription(label).performScrollTo().performTextReplacement(text)
     private fun choose(label: String) = compose.onNode(hasText(label) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)).performScrollTo().performClick()
     private fun field(label: String) = compose.onNodeWithContentDescription(label).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+
+    @Test fun catalogSearchImportAndAddToRoutineWithoutSuggestedWeights() {
+        start()
+        click("기본 운동에서 고르기")
+        compose.waitUntil(5000){model.state.value.catalog!=null}
+        enter("내 운동 검색","덤벨프레스")
+        compose.onNodeWithText("기본 덤벨 프레스").performScrollTo().assertIsDisplayed()
+        compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap->
+            File(compose.activity.cacheDir,"qa-exercise-catalog.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+        }
+        click("내 운동으로 가져오기")
+        compose.runOnIdle {
+            assertEquals(1,source.exercises.size)
+            assertEquals("PER_HAND",source.exercises.values.single().loadConvention)
+            assertEquals("내 운동",ui.get("liveWorkout.libraryTab"))
+            ui.go("W01")
+        }
+        click("새 루틴 만들기");enter("루틴 이름","새 상체 루틴");click("루틴에 운동 추가");click("루틴에 추가")
+        compose.runOnIdle {
+            val set=model.state.value.routineDraft!!.entries.single().sets.single()
+            assertEquals("",set.weight);assertEquals("",set.reps)
+        }
+        click("기본 루틴 저장")
+        compose.runOnIdle { assertEquals(1,source.routines.size);assertNull(source.routines.values.single().entries.single().sets.single().weightKg) }
+    }
 
     @Test fun firstExerciseToRoutineToWeekdayToActualSetAndRest() {
         start()
@@ -367,7 +393,11 @@ class LiveWorkoutFlowTest {
     }
 
     /** Keeps immutable snapshots so tests can detect accidentally rewriting original plans or actual values. */
-    private class FakeWorkouts : WorkoutDataSource {
+    private class FakeWorkouts : WorkoutDataSource, ExerciseCatalogDataSource {
+        override suspend fun exerciseCatalog(owner:String)=ExerciseCatalogDto("test","test source","https://example.com",listOf(
+            CatalogExercise("dumbbell-bench","기본 덤벨 프레스","덤벨","가슴","가슴","WEIGHT_REPS","PER_HAND",listOf("DB press"),"덤벨 한 개의 무게를 적어요.")))
+        override suspend fun importCatalogExercise(owner:String,key:String):ExerciseDto = exercises["catalog-copy"] ?: ExerciseDto("catalog-copy","기본 덤벨 프레스","덤벨","가슴","WEIGHT_REPS","PER_HAND",0).also { exercises[it.id]=it }
+
         val today = LocalDate.now().toString()
         val exercises = linkedMapOf<String, ExerciseDto>()
         val routines = linkedMapOf<String, RoutineDto>()

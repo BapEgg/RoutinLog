@@ -133,6 +133,7 @@ private fun LiveWorkoutWeek(ui: PreviewSession, model: WorkoutViewModel, state: 
     if (state.exercises.isEmpty()) UiCard {
         SectionTitle("내가 하는 운동부터 등록해요")
         MutedText("운동 이름과 기록 방식을 정하면 루틴에 넣을 수 있어요.")
+        UiButton("기본 운동에서 고르기", { ui.set("liveWorkout.pickFor","manage");ui.set("liveWorkout.libraryTab","기본 운동");ui.go("W05") }, primary=false)
         UiButton("첫 운동 등록", { editExercise(ui, null, "W01") })
     } else UiButton("새 루틴 만들기", { openRoutine(null) })
     UiButton("내 운동 목록", { ui.set("liveWorkout.pickFor", "manage"); ui.go("W05") }, primary = false)
@@ -203,12 +204,37 @@ private fun LiveRoutineEditor(ui: PreviewSession, model: WorkoutViewModel, state
 
 @Composable
 private fun LiveExerciseLibrary(ui: PreviewSession, model: WorkoutViewModel, state: WorkoutUiState) {
-    var query by remember { mutableStateOf("") }
+    var query by remember(state.userId) { mutableStateOf("") }
+    var group by remember(state.userId) { mutableStateOf("전체") }
+    val tab=ui.get("liveWorkout.libraryTab","내 운동")
     val purpose = ui.get("liveWorkout.pickFor", "manage")
-    Badge(when (purpose) { "routine" -> "기본 루틴에 넣을 운동"; "session" -> "이날 수행할 운동 추가"; "replace" -> "대신 수행할 운동 선택"; else -> "내가 등록한 운동" })
-    WorkoutField("내 운동 검색", query, { query = it }, hint = "운동 이름 또는 기구")
+    Badge(when (purpose) { "routine" -> "기본 루틴에 넣을 운동"; "session" -> "이날 수행할 운동 추가"; "replace" -> "대신 수행할 운동 선택"; else -> "운동 목록" })
+    Chips(listOf("내 운동","기본 운동"),tab){ui.set("liveWorkout.libraryTab",it)}
+    WorkoutField("내 운동 검색", query, { query = it }, hint = "운동 이름·기구·부위로 찾아보세요")
     UiButton("내 운동 직접 등록", { editExercise(ui, null, "W05") }, primary = false)
-    val results = state.exercises.filter { query.isBlank() || it.name.contains(query, true) || it.equipment.contains(query, true) }
+    if(tab=="기본 운동") {
+        LaunchedEffect(state.userId){model.loadCatalog()}
+        Chips(listOf("전체","하체","가슴","등","어깨","팔","몸통"),group){group=it}
+        state.catalogError?.let { UiCard { Text(it);UiButton("기본 목록 다시 불러오기",{model.loadCatalog(true)},false) } }
+        if(state.catalogLoading)LinearProgressIndicator(Modifier.fillMaxWidth(),color=DeepBlue)
+        state.catalog?.let { catalog->
+            MutedText("기록을 시작하기 위한 기본 목록이에요. 내 기구와 중량 기준을 확인한 뒤 가져오세요.")
+            val found=catalog.items.filter { it.matches(query,group) }
+            if(found.isEmpty())UiCard { BodyText("맞는 운동이 없어요. 검색어를 바꾸거나 직접 등록할 수 있어요.") }
+            found.forEach { item->UiCard {
+                Text(item.name,style=MaterialTheme.typography.titleMedium)
+                MutedText("${item.equipment} · ${item.target}")
+                Badge(recordLabels[item.recordType].orEmpty())
+                BodyText(item.recordingHint)
+                UiButton("내 운동으로 가져오기",{model.importCatalog(item.key){saved->query=saved.name;ui.set("liveWorkout.libraryTab","내 운동")}})
+            } }
+            val links=androidx.compose.ui.platform.LocalUriHandler.current
+            TextButton(onClick={links.openUri(catalog.sourceUrl)}){Text("분류 참고 · ${catalog.sourceName}")}
+            MutedText("무게·횟수·세트 목표는 직접 정해요. 부위가 비슷하다고 동일한 대체 운동으로 판단하지 않아요.")
+        }
+        return
+    }
+    val results = state.exercises.filter { query.isBlank() || it.name.contains(query, true) || it.equipment.contains(query, true) || it.target.contains(query, true) }
     if (results.isEmpty()) UiCard { BodyText("찾는 운동이 없으면 이름과 기록 방식을 직접 등록해주세요.") }
     results.forEach { exercise -> UiCard {
         ExerciseIdentity(exercise.snapshot())
@@ -272,7 +298,7 @@ private fun LiveExerciseDetails(ui: PreviewSession, model: WorkoutViewModel, sta
     val exercise = state.exercises.firstOrNull { it.id == ui.get("liveWorkout.exerciseId") }
     if (exercise == null) { WorkoutEmpty("이 운동 정보를 찾을 수 없어요.", "내 운동 목록", { ui.go("W05") }); return }
     LaunchedEffect(exercise.id, state.date) { model.loadHistory(exercise.id) }
-    UiCard { Badge("직접 등록한 운동"); ExerciseIdentity(exercise.snapshot()) }
+    UiCard { Badge("내 운동"); ExerciseIdentity(exercise.snapshot()) }
     UiButton("운동 정보 수정", { editExercise(ui, exercise.id, "W05") })
     WorkoutHistory(state, exercise.snapshot(), state.units)
 }
