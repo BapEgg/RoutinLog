@@ -45,6 +45,7 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
                     .requestMatchers(HttpMethod.GET, "/api/v1/food-catalog", "/api/v1/food-catalog/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.POST, "/api/v1/food-catalog/*/save").access(::accountAccess)
                     .requestMatchers(HttpMethod.POST, "/api/v1/food-url/preview").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/record-calendar").access(::accountAccess)
                     .anyRequest().denyAll()
             }
             .formLogin { it.disable() }

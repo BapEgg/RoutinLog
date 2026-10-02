@@ -49,7 +49,7 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource {
+) : AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
@@ -161,6 +161,7 @@ class AccountRepository internal constructor(
         return "Bearer ${session.accessToken}"
     }
     override suspend fun weeklyReport(owner:String,week:String?)=authorized { api.weeklyReport(stepAuth(it,owner),week) }.required()
+    override suspend fun recordCalendar(owner:String,month:String)=authorized { api.recordCalendar(stepAuth(it,owner),month) }.required()
     override suspend fun getReview(owner:String,week:String):WorkoutReviewDto? {
         val response=authorized { api.getReview(stepAuth(it,owner),week) }
         if(response.code()==404) { val error=response.error();if(error.code=="REVIEW_NOT_FOUND")return null;throw error }

@@ -14,6 +14,7 @@ import com.bapegg.routinlog.ui.MealViewModel
 import com.bapegg.routinlog.ui.WorkoutReviewViewModel
 import com.bapegg.routinlog.ui.MealReviewViewModel
 import com.bapegg.routinlog.ui.ReportViewModel
+import com.bapegg.routinlog.ui.RecordCalendarViewModel
 import com.bapegg.routinlog.ui.StepsViewModel
 import com.bapegg.routinlog.steps.RoutineLogServices
 import com.bapegg.routinlog.ui.ConditionViewModel
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
         val reviewFactory = viewModelFactory { initializer { WorkoutReviewViewModel(repository) } }
         val mealReviewFactory = viewModelFactory { initializer { MealReviewViewModel(repository) } }
         val reportFactory = viewModelFactory { initializer { ReportViewModel(repository) } }
+        val calendarFactory = viewModelFactory { initializer { RecordCalendarViewModel(repository) } }
         val stepsFactory = viewModelFactory { initializer { StepsViewModel(repository,services.steps) } }
         val mealFactory = viewModelFactory { initializer { MealViewModel(repository) } }
         val conditionFactory = viewModelFactory { initializer { ConditionViewModel(repository) } }
@@ -53,8 +55,9 @@ class MainActivity : ComponentActivity() {
                 val reviews: WorkoutReviewViewModel = viewModel(factory = reviewFactory)
                 val mealReviews: MealReviewViewModel = viewModel(factory = mealReviewFactory)
                 val reports: ReportViewModel = viewModel(factory = reportFactory)
+                val calendar: RecordCalendarViewModel = viewModel(factory = calendarFactory)
                 val steps: StepsViewModel = viewModel(factory = stepsFactory)
-                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps, reports, reviews,mealReviews)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps, reports, reviews,mealReviews,calendar)
             }
         }
     }

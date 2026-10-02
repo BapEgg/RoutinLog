@@ -79,7 +79,7 @@ jobs:
           fi
           python -c 'import json, os; assert json.load(open(os.environ["RUNNER_TEMP"] + "/health.json"))["status"] == "UP"'
           curl --fail --silent http://127.0.0.1:8080/api/v1/system/status
-          for path in api/v1/me/profile api/v1/body-measurements api/v1/foods api/v1/meal-templates api/v1/meal-plan api/v1/meal-records api/v1/workout-exercises api/v1/workout-routines api/v1/workout-plan api/v1/workout-days api/v1/workout-history api/v1/conditions api/v1/steps api/v1/step-connection api/v1/reports/weekly api/v1/workout-reviews api/v1/meal-reviews api/v1/food-catalog; do
+          for path in api/v1/me/profile api/v1/body-measurements api/v1/foods api/v1/meal-templates api/v1/meal-plan api/v1/meal-records api/v1/workout-exercises api/v1/workout-routines api/v1/workout-plan api/v1/workout-days api/v1/workout-history api/v1/conditions api/v1/steps api/v1/step-connection api/v1/reports/weekly api/v1/workout-reviews api/v1/meal-reviews api/v1/food-catalog api/v1/record-calendar; do
             code=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:8080/$path")
             test "$code" = 401
           done

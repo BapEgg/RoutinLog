@@ -42,4 +42,15 @@ class ReportRepositoryTest {
         assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
     }
     private fun json(value:String)=MockResponse().setHeader("Content-Type","application/json").setBody(value)
+    @Test fun `calendar retains explicit zero steps and null observations with account scoped authorization`()=runBlocking {
+        server.enqueue(json("""{"month":"2026-09-01","today":"2026-10-02","timeZone":"Asia/Seoul","days":[{"date":"2026-09-01","mealsEaten":4,"mealsSkipped":1,"weightKg":83.2,"waistCm":null,"workoutStatus":"IN_PROGRESS","workoutName":null,"doneSets":1,"skippedSets":1,"pendingSets":2,"workoutRecorded":true,"conditionRecorded":false,"steps":0}]}"""))
+        val day=repo.recordCalendar("test-user","2026-09-01").days.single()
+        val sent=server.takeRequest();assertEquals("/api/v1/record-calendar?month=2026-09-01",sent.path)
+        assertEquals("Bearer test-current",sent.getHeader("Authorization"));assertEquals(0L,day.steps);assertNull(day.waistCm)
+        assertEquals(4,day.categories);assertEquals(4,day.mealsEaten)
+    }
+    @Test fun `calendar from old account cannot send a request using current account`()=runBlocking {
+        try { repo.recordCalendar("another-user","2026-09-01");fail("Owner must match") }catch(e:AccountException){assertEquals(AccountErrorKind.CANCELLED,e.kind)}
+        assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS))
+    }
 }

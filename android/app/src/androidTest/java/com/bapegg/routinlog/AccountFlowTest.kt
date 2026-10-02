@@ -2,6 +2,7 @@ package com.bapegg.routinlog
 
 import android.app.Activity
 import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,6 +15,7 @@ import com.bapegg.routinlog.domain.NutritionMath
 import com.bapegg.routinlog.ui.AccountDrafts
 import com.bapegg.routinlog.ui.AccountViewModel
 import com.bapegg.routinlog.ui.MealViewModel
+import com.bapegg.routinlog.ui.RecordCalendarViewModel
 import com.bapegg.routinlog.ui.ReportViewModel
 import com.bapegg.routinlog.ui.WorkoutReviewViewModel
 import com.bapegg.routinlog.ui.MealReviewViewModel
@@ -48,18 +50,20 @@ class AccountFlowTest {
     private var workouts: WorkoutViewModel? = null
     private var conditions: ConditionViewModel? = null
     private var steps: StepsViewModel? = null
+    private var calendar: RecordCalendarViewModel? = null
     private var reports: ReportViewModel? = null
     private var reviews: WorkoutReviewViewModel? = null
     private var mealReviews: MealReviewViewModel? = null
 
     private fun session() = ViewModelProvider(compose.activity)[PreviewSession::class.java]
 
-    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null, reviewFake: ReviewFixture? = null, mealReviewFake: MealReviewFixture? = null) {
+    private fun start(fake: FakeAccountDataSource = FakeAccountDataSource(), mealFake: WrapperMealDataSource? = null, workoutFake: WrapperWorkoutDataSource? = null, conditionFake: WrapperConditionDataSource? = null, stepFake: StepFixture? = null, reportFake: ReportFixture? = null, reviewFake: ReviewFixture? = null, mealReviewFake: MealReviewFixture? = null, calendarFake: CalendarFixture? = null) {
         source = fake
         lateinit var model: RoutineLogViewModel
         compose.runOnUiThread {
             val factory = viewModelFactory {
                 initializer { AccountViewModel(source) }
+                initializer { RecordCalendarViewModel(requireNotNull(calendarFake)) }
                 initializer { ReportViewModel(requireNotNull(reportFake)) }
                 initializer { WorkoutReviewViewModel(requireNotNull(reviewFake)) }
                 initializer { MealReviewViewModel(requireNotNull(mealReviewFake)) }
@@ -71,6 +75,7 @@ class AccountFlowTest {
             }
             account = ViewModelProvider(compose.activity, factory)[AccountViewModel::class.java]
             model = ViewModelProvider(compose.activity, factory)[RoutineLogViewModel::class.java]
+            calendar = if(calendarFake==null)null else ViewModelProvider(compose.activity,factory)[RecordCalendarViewModel::class.java]
             reports = if(reportFake==null)null else ViewModelProvider(compose.activity,factory)[ReportViewModel::class.java]
             reviews = if(reviewFake==null)null else ViewModelProvider(compose.activity,factory)[WorkoutReviewViewModel::class.java]
             mealReviews = if(mealReviewFake==null)null else ViewModelProvider(compose.activity,factory)[MealReviewViewModel::class.java]
@@ -79,7 +84,7 @@ class AccountFlowTest {
             conditions = if (conditionFake == null) null else ViewModelProvider(compose.activity, factory)[ConditionViewModel::class.java]
             workouts = if (workoutFake == null) null else ViewModelProvider(compose.activity, factory)[WorkoutViewModel::class.java]
         }
-        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports, reviewModel = reviews,mealReviewModel=mealReviews) } }
+        compose.setContent { RoutineLogTheme { RoutineLogApp(model, accountModel = account, mealModel = meals, workoutModel = workouts, conditionModel = conditions, stepsModel = steps, reportModel = reports, reviewModel = reviews,mealReviewModel=mealReviews,calendarModel=calendar) } }
         compose.waitUntil(5_000) { account.state.value.ready && !account.state.value.busy }
         if(stepFake!=null)compose.waitUntil(5_000){steps?.state?.value?.let { it.loaded&&!it.busy }==true}
         if (conditionFake != null) compose.waitUntil(5_000) { conditions?.state?.value?.let { it.loaded && !it.loading } == true }
@@ -269,10 +274,76 @@ class AccountFlowTest {
         compose.onAllNodes(hasSetTextAction())[2].performTextReplacement(memo)
     }
 
+    @Test fun calendarShowsActualKindsAndOpensMealsAndWorkoutAtSelectedDate() {
+        val fixture=CalendarFixture()
+        start(mealFake=WrapperMealDataSource(),workoutFake=WrapperWorkoutDataSource(),calendarFake=fixture)
+        compose.waitUntil(5_000){calendar?.state?.value?.calendar!=null}
+        compose.onNodeWithText("기록 달력").performClick()
+        compose.onNodeWithContentDescription("이전 달").performScrollTo().performClick()
+        compose.waitUntil(5_000){calendar?.state?.value?.calendar?.month==fixture.previous.toString()}
+        val date=fixture.previous.plusDays(2).toString()
+        compose.onNodeWithContentDescription("$date · 5종류 기록").performScrollTo().performClick()
+        capture("qa-record-calendar.png")
+        compose.onNodeWithText("4끼").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("1끼").assertExists()
+        compose.onNodeWithText("이날 식단 보기").performScrollTo().performClick()
+        compose.waitUntil(5_000){meals?.state?.value?.date==date&&meals?.state?.value?.loaded==true}
+        compose.runOnIdle { assertEquals("F01",session().route);session().go("H01") }
+        compose.waitUntil(5_000){calendar?.state?.value?.calendar!=null}
+        capture("qa-record-home.png")
+        compose.onNodeWithText("운동 기록 이어가기").performScrollTo().performClick()
+        compose.waitUntil(5_000){workouts?.state?.value?.date==date&&workouts?.state?.value?.loaded==true}
+        compose.runOnIdle { assertEquals("W01",session().route) }
+    }
+    @Test fun calendarChangingDateRequiresDecisionForUnsentMealAndClearsAfterLogout() {
+        val fixture=CalendarFixture()
+        start(mealFake=WrapperMealDataSource(),calendarFake=fixture)
+        compose.waitUntil(5_000){meals?.state?.value?.loaded==true&&calendar?.state?.value?.calendar!=null}
+        compose.runOnIdle {
+            val slot=meals!!.state.value.plan!!.slots.first();meals!!.beginMeal(slot.id,slot.label)
+            session().set("home.date",fixture.previous.plusDays(2).toString())
+        }
+        compose.waitUntil(5_000){calendar?.state?.value?.calendar?.month==fixture.previous.toString()}
+        compose.onNodeWithText("이날 식단 보기").performScrollTo().performClick()
+        compose.onNodeWithText("작성 중인 식사가 있어요").assertIsDisplayed()
+        compose.runOnIdle { assertNotNull(meals!!.state.value.draft) }
+        compose.onNodeWithText("작성 중 식사 이어서").performClick()
+        compose.runOnIdle { assertEquals("F03",session().route);assertNotNull(meals!!.state.value.draft);source.expireFromAnotherFeature() }
+        compose.waitUntil(5_000){session().route=="A01"}
+        compose.runOnIdle { assertNull(calendar!!.state.value.calendar);assertNull(calendar!!.state.value.owner) }
+    }
+    @Test fun calendarLoadFailureShowsRetryInsteadOfAnEmptySuccessfulMonth() {
+        val fixture=CalendarFixture()
+        start(calendarFake=fixture)
+        compose.waitUntil(5_000){calendar?.state?.value?.calendar!=null}
+        compose.runOnIdle { fixture.fail=true;session().set("home.date",fixture.previous.toString()) }
+        compose.waitUntil(5_000){calendar?.state?.value?.error!=null}
+        compose.onNodeWithText("기록 다시 불러오기").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("아직 확인한 식사가 없어요.").assertDoesNotExist()
+        compose.runOnIdle { fixture.fail=false }
+        compose.onNodeWithText("기록 다시 불러오기").performClick()
+        compose.waitUntil(5_000){calendar?.state?.value?.calendar!=null}
+        compose.onNodeWithText("아직 확인한 식사가 없어요.").performScrollTo().assertIsDisplayed()
+    }
+    private class CalendarFixture: RecordCalendarDataSource {
+        val today=LocalDate.now(ZoneId.of("Asia/Seoul"))
+        val previous=today.minusMonths(1).withDayOfMonth(1)
+        var fail=false
+        override suspend fun recordCalendar(owner:String,month:String):RecordCalendar {
+            if(fail)throw networkError()
+            val from=LocalDate.parse(month)
+            val to=minOf(java.time.YearMonth.from(from).atEndOfMonth(),today)
+            return RecordCalendar(month,today.toString(),"Asia/Seoul",from.datesUntil(to.plusDays(1)).map { day ->
+                if(day==previous.plusDays(2))RecordDay(day.toString(),4,1,BigDecimal("83.2"),null,"IN_PROGRESS","하체 A",2,1,3,true,true,0L)
+                else RecordDay(day.toString(),0,0,null,null,null,null,0,0,0,false,false,null)
+            }.toList())
+        }
+    }
+
     private fun capture(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         try {
             FileOutputStream(File(instrumentation.targetContext.cacheDir, name)).use {
                 assertTrue("Screenshot could not be encoded", bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
