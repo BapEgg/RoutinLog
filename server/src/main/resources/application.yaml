@@ -53,6 +53,9 @@ logging:
     org.hibernate.orm.jdbc.bind: WARN
 
 routinlog:
+  ai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:}
   auth:
     # A Web OAuth client ID, never an Android client ID or a client secret.
     # An empty value disables Google sign-in without preventing health/startup.

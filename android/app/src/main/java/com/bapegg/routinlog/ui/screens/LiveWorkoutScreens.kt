@@ -66,6 +66,8 @@ private data class RoutineOpen(val id: String?)
 
 @Composable
 private fun LiveWorkoutWeek(ui: PreviewSession, model: WorkoutViewModel, state: WorkoutUiState) {
+    UiButton("프로그램에서 루틴 시작",{ui.go("W02")},primary=false)
+    UiButton("나의 워밍업 · 스트레칭",{ui.go("W17")},primary=false)
     var dateOpen by remember { mutableStateOf(false) }
     var date by remember(state.date) { mutableStateOf(state.date) }
     var opening by remember { mutableStateOf<RoutineOpen?>(null) }
@@ -300,6 +302,9 @@ private fun LiveExerciseDetails(ui: PreviewSession, model: WorkoutViewModel, sta
     LaunchedEffect(exercise.id, state.date) { model.loadHistory(exercise.id) }
     UiCard { Badge("내 운동"); ExerciseIdentity(exercise.snapshot()) }
     UiButton("운동 정보 수정", { editExercise(ui, exercise.id, "W05") })
+    PrivatePhoto("exercise",exercise.id,exercise.name)
+    val uri=androidx.compose.ui.platform.LocalUriHandler.current
+    UiCard { SectionTitle("운동법 확인");MutedText("NASM 운동 라이브러리에서 종목과 기구를 확인할 수 있어요. 개인 사진은 자세 검증 자료가 아니에요.");UiButton("운동 라이브러리 열기",{uri.openUri("https://www.nasm.org/resource-center/exercise-library")},false) }
     WorkoutHistory(state, exercise.snapshot(), state.units)
 }
 

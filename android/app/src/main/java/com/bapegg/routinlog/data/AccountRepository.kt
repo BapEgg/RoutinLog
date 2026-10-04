@@ -49,11 +49,20 @@ class AccountRepository internal constructor(
     private val googleConfigured: Boolean,
     private val clearProviderState: suspend () -> Unit = {},
     private val now: () -> Long = { Instant.now().epochSecond },
-) : ExerciseCatalogDataSource, CardioDataSource, AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
+    private val onAccountDeleted: (String) -> Unit = {},
+) : FeatureDataSource, ExerciseCatalogDataSource, CardioDataSource, AccountDataSource, MealDataSource, WorkoutDataSource, ConditionDataSource, StepDataSource, ReportDataSource, WorkoutReviewDataSource, MealReviewDataSource, RecordCalendarDataSource {
     private val mutex = Mutex()
     @Volatile private var session: StoredSession? = null
     private val identityState = MutableStateFlow<AccountIdentity?>(null)
     override val identity: StateFlow<AccountIdentity?> = identityState.asStateFlow()
+    override suspend fun programs(owner:String)=authorized { api.programs(stepAuth(it,owner)) }.required()
+    override suspend fun applyProgram(owner:String,write:ProgramApply)=authorized { api.applyProgram(stepAuth(it,owner),write) }.required()
+    override suspend fun preparation(owner:String)=authorized { api.preparation(stepAuth(it,owner)) }.required()
+    override suspend fun savePreparation(owner:String,write:PreparationDto)=authorized { api.savePreparation(stepAuth(it,owner),write) }.required()
+    override suspend fun analyze(owner:String,write:AnalysisWrite)=authorized { api.analyze(stepAuth(it,owner),write) }.required()
+    override suspend fun exportRecords(owner:String)=authorized { api.exportRecords(stepAuth(it,owner)) }.required()
+    override suspend fun photo(owner:String,kind:String,id:String)=authorized { api.photo(stepAuth(it,owner),kind,id) }.required()
+    override suspend fun savePhoto(owner:String,kind:String,id:String,write:ThumbnailDto)=authorized { api.savePhoto(stepAuth(it,owner),kind,id,write) }.required()
 
     override suspend fun login(activity: Activity): AccountIdentity {
         if (!googleConfigured) throw AccountException(AccountErrorKind.CONFIGURATION, "Google 로그인 설정이 아직 준비되지 않았어요.")
@@ -114,6 +123,7 @@ class AccountRepository internal constructor(
         }.checkStatus()
         // Once server deletion succeeds, cancellation must not leave a deleted account signed in locally.
         withContext(NonCancellable) {
+            runCatching { onAccountDeleted(deleting.userId) }
             val cleared = withContext(Dispatchers.IO) {
                 mutex.withLock {
                     if (session?.userId == deleting.userId) { clearLocked(); true } else false
@@ -318,7 +328,7 @@ class AccountRepository internal constructor(
         fun create(context: Context, baseUrl: String, debug: Boolean, googleWebClientId: String): AccountRepository {
             val app = context.applicationContext
             val google = GoogleCredentialSignIn(googleWebClientId)
-            return AccountRepository(api(baseUrl, debug), EncryptedSessionStore(app), google, googleWebClientId.isNotBlank(), { google.clear(app) })
+            return AccountRepository(api(baseUrl, debug), EncryptedSessionStore(app), google, googleWebClientId.isNotBlank(), { google.clear(app) },onAccountDeleted={owner->com.bapegg.routinlog.notifications.RecordReminders(app).erase(owner)})
         }
 
         internal fun forTesting(baseUrl: String, store: SessionStore, clearProviderState: suspend () -> Unit = {}, now: () -> Long = { Instant.now().epochSecond }): AccountRepository =
@@ -332,8 +342,8 @@ class AccountRepository internal constructor(
             if (!url.isHttps && !(debug && url.host in setOf("10.0.2.2", "localhost", "127.0.0.1"))) {
                 throw AccountException(AccountErrorKind.CONFIGURATION, "안전한 HTTPS 서버 주소가 필요해요.")
             }
-            val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
-                .writeTimeout(20, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS)
+            val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(40, TimeUnit.SECONDS)
+                .writeTimeout(20, TimeUnit.SECONDS).callTimeout(45, TimeUnit.SECONDS)
                 .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build()
             return Retrofit.Builder().baseUrl(url).client(client)
                 .addConverterFactory(GsonConverterFactory.create(GsonBuilder().serializeNulls().create()))

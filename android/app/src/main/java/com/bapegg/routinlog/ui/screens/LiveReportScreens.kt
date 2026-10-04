@@ -27,6 +27,7 @@ import java.util.Locale
     MutedText("${report.from} — ${report.to}${if(report.to!=report.weekEnd) " · 이번 주 진행 중" else " · 월~일"}")
     when(id) {
         "R01" -> {
+            LocalFeatures.current?.let { LiveAnalysis(ui,it,report.from) }
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 UiButton("이전 주",{model.move(-1)},false,report.from>"1900-01-08",Modifier.weight(1f))
                 UiButton("다음 주",{model.move(1)},false,report.from<report.latestWeek,Modifier.weight(1f))

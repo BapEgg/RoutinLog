@@ -1,0 +1,59 @@
+# Invoke with: docker compose --env-file <private-env> -f deploy/compose.production.yaml up -d --build
+name: routinlog-production
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: routinlog
+      POSTGRES_USER: routinlog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a production database password}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routinlog -d routinlog"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+  server:
+    build: ../server
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 1g
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/routinlog
+      DB_USERNAME: routinlog
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set a production database password}
+      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID:?Set the production Google web client ID}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      SPRING_PROFILES_ACTIVE: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ROUTINLOG_DOMAIN: ${ROUTINLOG_DOMAIN:?Set a public DNS hostname}
+      ACME_EMAIL: ${ACME_EMAIL:?Set the TLS certificate contact email}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy-config:/config
+    depends_on: [server]
+    logging: *logging
+volumes:
+  database:
+  certificates:
+  caddy-config:

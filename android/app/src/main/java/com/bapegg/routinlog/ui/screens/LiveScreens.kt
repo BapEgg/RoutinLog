@@ -116,11 +116,17 @@ import java.util.Locale
         UiRow("프로필 · 목표 · 단위", "저장한 기준 확인과 수정",icon="UserRound",onClick={ui.go("S02")})
         UiRow("걸음수 · 권한 관리", "이 휴대폰의 걸음 연결",icon="Footprints",onClick={ui.go("S03")})
         UiRow("데이터 · 계정", "계정 연결 관리",icon="ShieldCheck",onClick={ui.go("S04")})
+        UiRow("알림", "기록과 주간 리포트 알림",icon="Bell",onClick={ui.go("S05")})
     }
     else UiCard {
         UiRow("계정과 기록 삭제","Google 본인 확인 후 삭제",icon="Trash2",onClick={ui.go("S06")})
-        MutedText("파일 내보내기는 추후 제공돼요. 신체 기록은 기록별 수정 화면에서도 삭제할 수 있어요.")
+        MutedText("신체 기록은 기록별 수정 화면에서도 삭제할 수 있어요.")
     }
+    if(accountPage)LocalFeatures.current?.let { ExportRecords(it) }
+    val uri=androidx.compose.ui.platform.LocalUriHandler.current
+    if(com.bapegg.routinlog.BuildConfig.PRIVACY_URL.isNotBlank())UiButton("개인정보 처리방침",{uri.openUri(com.bapegg.routinlog.BuildConfig.PRIVACY_URL)},false)
+    if(com.bapegg.routinlog.BuildConfig.TERMS_URL.isNotBlank())UiButton("이용약관",{uri.openUri(com.bapegg.routinlog.BuildConfig.TERMS_URL)},false)
+    if(com.bapegg.routinlog.BuildConfig.SUPPORT_EMAIL.isNotBlank())UiButton("지원 문의",{uri.openUri("mailto:"+com.bapegg.routinlog.BuildConfig.SUPPORT_EMAIL)},false)
     UiButton("샘플 화면 둘러보기",{ui.startPreview()},primary=false)
     var confirm by remember{mutableStateOf(false)}
     UiButton("로그아웃",{confirm=true},primary=false)

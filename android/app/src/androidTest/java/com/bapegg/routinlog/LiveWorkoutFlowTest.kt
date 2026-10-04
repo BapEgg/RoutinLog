@@ -393,7 +393,7 @@ class LiveWorkoutFlowTest {
     }
 
     /** Keeps immutable snapshots so tests can detect accidentally rewriting original plans or actual values. */
-    private class FakeWorkouts : WorkoutDataSource, ExerciseCatalogDataSource {
+    internal class FakeWorkouts : WorkoutDataSource, ExerciseCatalogDataSource {
         override suspend fun exerciseCatalog(owner:String)=ExerciseCatalogDto("test","test source","https://example.com",listOf(
             CatalogExercise("dumbbell-bench","기본 덤벨 프레스","덤벨","가슴","가슴","WEIGHT_REPS","PER_HAND",listOf("DB press"),"덤벨 한 개의 무게를 적어요.")))
         override suspend fun importCatalogExercise(owner:String,key:String):ExerciseDto = exercises["catalog-copy"] ?: ExerciseDto("catalog-copy","기본 덤벨 프레스","덤벨","가슴","WEIGHT_REPS","PER_HAND",0).also { exercises[it.id]=it }

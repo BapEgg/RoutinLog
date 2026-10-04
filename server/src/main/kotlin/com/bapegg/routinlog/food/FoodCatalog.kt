@@ -98,6 +98,14 @@ class FoodCatalogImport(private val jdbc:JdbcTemplate,private val json:ObjectMap
 }
 
 @Component
-class FoodCatalogLoader(private val importer:FoodCatalogImport,@param:Value("\${routinlog.food-catalog.import-file:}")private val file:String):ApplicationRunner {
-    override fun run(args:ApplicationArguments) { if(file.isNotBlank())importer.importFile(Path.of(file)) }
+class FoodCatalogLoader(private val importer:FoodCatalogImport,@param:Value("\${routinlog.food-catalog.import-file:}")private val file:String,
+    @param:Value("\${routinlog.food-catalog.exit-after-import:false}")private val exitAfterImport:Boolean,
+    private val context:org.springframework.context.ConfigurableApplicationContext):ApplicationRunner {
+    override fun run(args:ApplicationArguments) {
+        require(!exitAfterImport||file.isNotBlank()){ "An import file is required for one-shot import." }
+        if(file.isNotBlank()) {
+            importer.importFile(Path.of(file))
+            if(exitAfterImport)org.springframework.boot.SpringApplication.exit(context)
+        }
+    }
 }

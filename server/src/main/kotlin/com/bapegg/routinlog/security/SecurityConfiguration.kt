@@ -51,6 +51,9 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/cardio/*").access(::accountAccess)
                     .requestMatchers(HttpMethod.GET, "/api/v1/workout-catalog").access(::accountAccess)
                     .requestMatchers(HttpMethod.POST, "/api/v1/workout-catalog/*/save").access(::accountAccess)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/features/programs", "/api/v1/features/preparation", "/api/v1/features/cardio-activities", "/api/v1/features/export", "/api/v1/features/photos/*/*").access(::accountAccess)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/features/programs/apply", "/api/v1/features/analysis").access(::accountAccess)
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/features/preparation", "/api/v1/features/photos/*/*").access(::accountAccess)
                     .anyRequest().denyAll()
             }
             .formLogin { it.disable() }
@@ -61,6 +64,7 @@ class SecurityConfiguration(private val sessions: AuthSessionService) {
             // Credentials are explicit Authorization headers; no cookie/session authentication is accepted.
             .csrf { it.disable() }
             .addFilterBefore(OpaqueTokenFilter(sessions), UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(AccessAuditFilter(), OpaqueTokenFilter::class.java)
             .addFilterBefore(AuthRateLimitFilter(), OpaqueTokenFilter::class.java)
             .exceptionHandling {
                 it.authenticationEntryPoint { _, response, _ -> SecurityErrorWriter.write(response, 401, "AUTH_REQUIRED", "로그인이 필요해요.") }

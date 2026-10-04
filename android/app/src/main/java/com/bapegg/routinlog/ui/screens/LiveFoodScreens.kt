@@ -337,6 +337,7 @@ private fun LiveFoodDetail(ui: PreviewSession, state: MealUiState) {
     LiveNutritionPanel("원본 영양정보", NutritionMath.totals(listOf(food.nutrition)))
     food.sourceNote?.takeIf { it.isNotBlank() }?.let { UiCard { SectionTitle("출처 메모"); BodyText(it) } }
     UiButton("음식 정보 수정", { openFoodForm(ui, food.id, "F06") })
+    PrivatePhoto("food",food.id,food.name)
 }
 
 @Composable

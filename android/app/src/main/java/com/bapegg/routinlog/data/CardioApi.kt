@@ -8,9 +8,10 @@ import retrofit2.http.*
 @Keep data class CardioValues(val activity:String,val minutes:Int,val deviceKcal:BigDecimal?=null,
     val energyKind:String?=null,val deviceName:String?=null,val speedKmh:BigDecimal?=null,
     val inclinePercent:BigDecimal?=null,val distanceKm:BigDecimal?=null,val effort:Int?=null,
-    val fatigue:String?=null,val memo:String?=null) { override fun toString()="CardioValues(redacted)" }
+    val fatigue:String?=null,val memo:String?=null,val metCode:String?=null) { override fun toString()="CardioValues(redacted)" }
 @Keep data class CardioWrite(val date:String,val values:CardioValues,val version:Long?=null)
-@Keep data class CardioDto(val id:String,val date:String,val values:CardioValues,val version:Long)
+@Keep data class CardioEstimate(val code:String,val label:String,val met:BigDecimal,val weightKg:BigDecimal,val weightSource:String,val totalKcal:BigDecimal,val activeKcal:BigDecimal,val method:String,val sourceUrl:String)
+@Keep data class CardioDto(val id:String,val date:String,val values:CardioValues,val version:Long,val estimate:CardioEstimate?=null)
 @Keep data class CardioList(val items:List<CardioDto>)
 interface CardioDataSource {
     suspend fun listCardio(owner:String,from:String,to:String):List<CardioDto>

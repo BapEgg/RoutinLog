@@ -25,11 +25,11 @@ enum class CardioEnergyKind { ACTIVE, TOTAL, UNKNOWN }
 data class CardioValues(val activity:String,val minutes:Int,val deviceKcal:BigDecimal?=null,
     val energyKind:CardioEnergyKind?=null,val deviceName:String?=null,val speedKmh:BigDecimal?=null,
     val inclinePercent:BigDecimal?=null,val distanceKm:BigDecimal?=null,val effort:Int?=null,
-    val fatigue:String?=null,val memo:String?=null) {
+    val fatigue:String?=null,val memo:String?=null,val metCode:String?=null) {
     override fun toString()="CardioValues(redacted)"
 }
 data class CardioWrite(val date:LocalDate,val values:CardioValues,val version:Long?=null)
-data class CardioDto(val id:UUID,val date:LocalDate,val values:CardioValues,val version:Long)
+data class CardioDto(val id:UUID,val date:LocalDate,val values:CardioValues,val version:Long,val estimate:CardioEstimate?=null)
 data class CardioList(val items:List<CardioDto>)
 class CardioException(val status:HttpStatus,val code:String,message:String):RuntimeException(message)
 
@@ -58,7 +58,21 @@ class CardioService(private val jdbc:JdbcTemplate,private val entities:EntityMan
         val others=range(owner,write.date,write.date).filterNot { it.id==id }
         if(others.size>=24||others.sumOf { it.values.minutes }+v.minutes>1440)
             throw CardioException(HttpStatus.BAD_REQUEST,"DAILY_LIMIT","하루 기록은 24개, 총 운동 시간은 24시간 이내로 입력해주세요.")
-        val saved=CardioDto(id,write.date,cleaned,(old?.version ?: -1)+1)
+        val estimate=v.metCode?.let { code->
+            if(CardioEstimation.activities.none { it.code==code })invalid()
+            if(code in setOf("17355","17358")) {
+                if(v.inclinePercent!=null&&v.inclinePercent.signum()!=0)invalid()
+                val range=if(code=="17355")BigDecimal("4.8")..BigDecimal("5.5") else BigDecimal("5.6")..BigDecimal("6.3")
+                if(v.speedKmh!=null&&v.speedKmh !in range)invalid()
+            }
+            val profile=jdbc.query("SELECT age,initial_weight_kg,effective_from FROM user_profile_revisions WHERE user_id=? AND effective_from<=? ORDER BY effective_from DESC,revision DESC LIMIT 1",
+                {rs,_->Triple(rs.getInt(1),rs.getBigDecimal(2),rs.getDate(3).toLocalDate())},owner,write.date).firstOrNull()
+            if(profile==null||profile.first !in 19..59)throw CardioException(HttpStatus.BAD_REQUEST,"ESTIMATE_UNAVAILABLE","이 추정은 19~59세 성인 기준이에요. 시간이나 기기 값으로 기록해주세요.")
+            val weight=jdbc.query("SELECT weight_kg,measured_on FROM body_measurements WHERE user_id=? AND measured_on BETWEEN ? AND ? AND weight_kg IS NOT NULL ORDER BY measured_on DESC LIMIT 1",
+                {rs,_->rs.getBigDecimal(1) to rs.getDate(2).toLocalDate()},owner,write.date.minusDays(30),write.date).firstOrNull()
+            CardioEstimation.calculate(code,weight?.first ?: profile.second,v.minutes,if(weight!=null)"${weight.second} 측정"else"${profile.third} 시작 설정")
+        }
+        val saved=CardioDto(id,write.date,cleaned,(old?.version ?: -1)+1,estimate)
         if(old==null)jdbc.update("INSERT INTO cardio_records(user_id,id,recorded_on,version,payload) VALUES(?,?,?,?,?)",owner,id,saved.date,saved.version,json.writeValueAsString(saved))
         else jdbc.update("UPDATE cardio_records SET recorded_on=?,version=?,payload=? WHERE user_id=? AND id=?",saved.date,saved.version,json.writeValueAsString(saved),owner,id)
         return saved

@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
         val cardioFactory = viewModelFactory { initializer { CardioViewModel(repository) } }
         val conditionFactory = viewModelFactory { initializer { ConditionViewModel(repository) } }
         val workoutFactory = viewModelFactory { initializer { WorkoutViewModel(repository) } }
+        val featureFactory = viewModelFactory { initializer { com.bapegg.routinlog.ui.FeatureViewModel(repository) } }
         setContent {
             RoutineLogTheme {
                 val model: RoutineLogViewModel = viewModel(factory = factory)
@@ -60,7 +61,8 @@ class MainActivity : ComponentActivity() {
                 val reports: ReportViewModel = viewModel(factory = reportFactory)
                 val calendar: RecordCalendarViewModel = viewModel(factory = calendarFactory)
                 val steps: StepsViewModel = viewModel(factory = stepsFactory)
-                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps, reports, reviews,mealReviews,calendar,cardio)
+                val features: com.bapegg.routinlog.ui.FeatureViewModel = viewModel(factory = featureFactory)
+                RoutineLogApp(model, if (BuildConfig.DEBUG) intent.getStringExtra("preview_route") else null, account, meals, workouts, conditions, steps, reports, reviews,mealReviews,calendar,cardio,features)
             }
         }
     }

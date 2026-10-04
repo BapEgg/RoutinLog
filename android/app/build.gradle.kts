@@ -24,6 +24,13 @@ val debugApiUrl = providers.gradleProperty("routinlog.debugApiBaseUrl")
 val googleWebClientId = providers.gradleProperty("routinlog.googleWebClientId")
     .orElse(providers.environmentVariable("GOOGLE_WEB_CLIENT_ID"))
     .orElse(localSettings.getProperty("routinlog.googleWebClientId", "")).get().trim()
+val signingPath=providers.environmentVariable("ROUTINLOG_KEYSTORE").orElse("").get()
+val signingStorePassword=providers.environmentVariable("ROUTINLOG_STORE_PASSWORD").orElse("").get()
+val signingAlias=providers.environmentVariable("ROUTINLOG_KEY_ALIAS").orElse("").get()
+val signingKeyPassword=providers.environmentVariable("ROUTINLOG_KEY_PASSWORD").orElse("").get()
+val privacyUrl=providers.environmentVariable("ROUTINLOG_PRIVACY_URL").orElse("").get()
+val termsUrl=providers.environmentVariable("ROUTINLOG_TERMS_URL").orElse("").get()
+val supportEmail=providers.environmentVariable("ROUTINLOG_SUPPORT_EMAIL").orElse("").get()
 
 android {
     namespace = "com.bapegg.routinlog"
@@ -37,6 +44,18 @@ android {
         versionName = "0.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", googleWebClientId.asJavaLiteral())
+        buildConfigField("String", "PRIVACY_URL", privacyUrl.asJavaLiteral())
+        buildConfigField("String", "TERMS_URL", termsUrl.asJavaLiteral())
+        buildConfigField("String", "SUPPORT_EMAIL", supportEmail.asJavaLiteral())
+    }
+
+    signingConfigs {
+        if(signingPath.isNotBlank())create("production") {
+            storeFile=file(signingPath)
+            storePassword=signingStorePassword
+            keyAlias=signingAlias
+            keyPassword=signingKeyPassword
+        }
     }
 
     buildTypes {
@@ -45,6 +64,7 @@ android {
             buildConfigField("String", "API_BASE_URL", debugApiUrl.asJavaLiteral())
         }
         release {
+            if(signingPath.isNotBlank())signingConfig=signingConfigs.getByName("production")
             isMinifyEnabled = true
             buildConfigField("String", "API_BASE_URL", releaseApiUrl.asJavaLiteral())
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -68,6 +88,13 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
             endpoint.userInfo == null && endpoint.query == null && endpoint.fragment == null &&
             releaseApiUrl.endsWith("/")) {
             "Release requires routinlog.apiBaseUrl / ROUTINLOG_API_BASE_URL: a real HTTPS base URL ending in /."
+        }
+        require(googleWebClientId.endsWith(".apps.googleusercontent.com")){"Release requires the production Google web client ID."}
+        require(signingPath.isNotBlank()&&file(signingPath).isFile&&signingStorePassword.isNotBlank()&&signingAlias.isNotBlank()&&signingKeyPassword.isNotBlank()) {
+            "Release requires ROUTINLOG_KEYSTORE, ROUTINLOG_STORE_PASSWORD, ROUTINLOG_KEY_ALIAS and ROUTINLOG_KEY_PASSWORD."
+        }
+        require(listOf(privacyUrl,termsUrl).all { val u=runCatching { URI(it) }.getOrNull();u?.scheme=="https"&&!u.host.isNullOrBlank()&&u.userInfo==null }&&supportEmail.contains('@')) {
+            "Release requires published ROUTINLOG_PRIVACY_URL, ROUTINLOG_TERMS_URL and ROUTINLOG_SUPPORT_EMAIL."
         }
     }
 }

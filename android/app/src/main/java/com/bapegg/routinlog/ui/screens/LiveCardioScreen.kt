@@ -68,6 +68,12 @@ import com.bapegg.routinlog.ui.theme.DeepBlue
             }
             UiCard {
                 SectionTitle("기억할 운동 조건")
+                Text("표준 소비 열량 추정 · 선택")
+                listOf("17355" to "트레드밀 걷기 · 4.8~5.5 km/h · 경사 0%","17358" to "트레드밀 걷기 · 5.6~6.3 km/h · 경사 0%",
+                    "01214" to "실내 자전거 · 50 W","01220" to "실내 자전거 · 90~100 W","02048" to "일립티컬 · 보통 강도").forEach { (code,label)->
+                    Choice(label,selected=draft.metCode==code){model.edit { it.copy(metCode=if(it.metCode==code)null else code) }}
+                }
+                MutedText("실제로 수행한 조건과 일치할 때만 선택해주세요. 19~59세 표준 MET와 해당 날짜 이전 체중을 사용해요. 경사나 부하가 다르면 선택하지 마세요.")
                 UiButton(if(options)"추가 항목 접기"else"속도·경사·체감 강도 추가",{options=!options},false)
                 if(options) {
                     CardioField("속도 · km/h · 선택",draft.speed,{v->model.edit { it.copy(speed=v) }},true)
@@ -120,6 +126,16 @@ import com.bapegg.routinlog.ui.theme.DeepBlue
     v.effort?.let { KeyValue("체감 강도","$it / 10") }
     v.fatigue?.let { KeyValue("운동 후 피로",when(it){"LOW"->"낮음";"HIGH"->"높음";else->"보통"}) }
     v.memo?.let { MutedText(it) }
+    record.estimate?.let { estimate->
+        SectionTitle("표준 MET 추정")
+        MutedText(estimate.label)
+        KeyValue("총 소비 추정","${estimate.totalKcal} kcal")
+        KeyValue("휴식분 제외 추정","${estimate.activeKcal} kcal")
+        MutedText("${estimate.met} MET × ${estimate.weightKg} kg × 시간(h). 체중 기준: ${estimate.weightSource}. 휴식분은 1 MET를 제외했어요.")
+        MutedText("2024 Adult Compendium · 개인 체력·피로·동작 효율의 차이를 정밀하게 반영하지 않아요. 기기 값이나 걸음 수와 합산하지 않아요.")
+        val uri=androidx.compose.ui.platform.LocalUriHandler.current
+        TextButton(onClick={uri.openUri(estimate.sourceUrl)}){Text("추정 근거 보기")}
+    }
 }
 @Composable internal fun CardioReport(records:List<CardioDto>) {
     UiCard {

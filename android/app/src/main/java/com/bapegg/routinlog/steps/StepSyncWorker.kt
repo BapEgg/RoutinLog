@@ -16,6 +16,7 @@ class RoutineLogServices private constructor(context:Context) {
     init {
         // Ignore the initial unrestored null; react to logout/expiry even without a visible Activity.
         scope.launch { accounts.identity.dropWhile { it==null }.collect { identity->
+            com.bapegg.routinlog.notifications.RecordReminders(context).bind(identity?.userId)
             try { steps.bind(identity?.userId) }catch(cancelled:CancellationException){throw cancelled}catch(_:Exception){ /* Retried by the UI/worker; do not log account details. */ }
         } }
     }

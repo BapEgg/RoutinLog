@@ -1,6 +1,8 @@
 # Credentials, machine configuration, and generated output
 .env
 .env.*
+**/*.env
+!**/*.env.example
 !.env.example
 **/local.properties
 **/*.jks
@@ -10,6 +12,9 @@
 **/service-account*.json
 *.pem
 *.key
+**/*.dump
+**/*.dump.sha256
+**/*.dump.part
 .idea/
 .vscode/
 .DS_Store

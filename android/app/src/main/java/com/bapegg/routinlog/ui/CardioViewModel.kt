@@ -14,7 +14,7 @@ val LocalCardio=staticCompositionLocalOf<CardioViewModel?> { null }
 data class CardioDraft(val id:String=UUID.randomUUID().toString(),val version:Long?=null,
     val activity:String="",val minutes:String="",val device:Boolean=false,val kcal:String="",
     val energyKind:String="UNKNOWN",val deviceName:String="",val speed:String="",val incline:String="",
-    val distance:String="",val effort:Int?=null,val fatigue:String?=null,val memo:String="") {
+    val distance:String="",val effort:Int?=null,val fatigue:String?=null,val memo:String="",val metCode:String?=null) {
     override fun toString()="CardioDraft(redacted)"
 }
 data class CardioUiState(val owner:String?=null,val date:String=LocalDate.now().toString(),val records:List<CardioDto> = emptyList(),
@@ -57,7 +57,7 @@ class CardioViewModel(private val source:CardioDataSource):ViewModel() {
         if(!editable()||state.value.draft!=null)return
         val draft=record?.let { r->val v=r.values;CardioDraft(r.id,r.version,v.activity,v.minutes.toString(),v.deviceKcal!=null,
             v.deviceKcal?.toPlainString().orEmpty(),v.energyKind ?: "UNKNOWN",v.deviceName.orEmpty(),v.speedKmh?.toPlainString().orEmpty(),
-            v.inclinePercent?.toPlainString().orEmpty(),v.distanceKm?.toPlainString().orEmpty(),v.effort,v.fatigue,v.memo.orEmpty()) } ?: CardioDraft()
+            v.inclinePercent?.toPlainString().orEmpty(),v.distanceKm?.toPlainString().orEmpty(),v.effort,v.fatigue,v.memo.orEmpty(),v.metCode) } ?: CardioDraft()
         mutable.update { it.copy(drafts=it.drafts+(it.date to draft),error=null) }
     }
     fun edit(change:(CardioDraft)->CardioDraft) { if(editable())mutable.update { s->s.draft?.let { s.copy(drafts=s.drafts+(s.date to change(it))) } ?: s } }
@@ -103,6 +103,6 @@ class CardioViewModel(private val source:CardioDataSource):ViewModel() {
         if(d.device)require(kcal!=null&&device!=null&&d.energyKind in setOf("ACTIVE","TOTAL","UNKNOWN")){"기기 이름과 표시된 칼로리를 입력해주세요."}
         require(d.effort==null||d.effort in 1..10)
         require(d.fatigue==null||d.fatigue in setOf("LOW","MODERATE","HIGH"))
-        return CardioValues(name,minutes,kcal,if(d.device)d.energyKind else null,device,number(d.speed,"150"),number(d.incline,"100"),number(d.distance,"1500"),d.effort,d.fatigue,text(d.memo,1000))
+        return CardioValues(name,minutes,kcal,if(d.device)d.energyKind else null,device,number(d.speed,"150"),number(d.incline,"100"),number(d.distance,"1500"),d.effort,d.fatigue,text(d.memo,1000),d.metCode)
     }
 }

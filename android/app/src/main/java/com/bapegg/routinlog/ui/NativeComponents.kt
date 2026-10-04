@@ -113,7 +113,7 @@ fun UiCard(dark: Boolean = false, modifier: Modifier = Modifier, content: @Compo
 @Composable fun Input(label:String,value:String,onValueChange:(String)->Unit,suffix:String="",numeric:Boolean=false,multiline:Boolean=false,enabled:Boolean=true) {
     Column(verticalArrangement=Arrangement.spacedBy(7.dp)) {
         Text(label,fontSize=13.sp,fontWeight=FontWeight.Medium)
-        OutlinedTextField(value=value,onValueChange=onValueChange,enabled=enabled,modifier=Modifier.fillMaxWidth(),
+        OutlinedTextField(value=value,onValueChange=onValueChange,enabled=enabled,modifier=Modifier.fillMaxWidth().semantics { contentDescription=label },
             singleLine=!multiline,minLines=if(multiline)3 else 1,shape=RoundedCornerShape(12.dp),
             suffix=if(suffix.isBlank())null else ({Text(suffix)}),
             keyboardOptions=KeyboardOptions(keyboardType=if(numeric)KeyboardType.Decimal else KeyboardType.Text),
